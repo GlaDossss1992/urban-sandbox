@@ -1,0 +1,2962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Urban Sandbox — 3D Sketchpad for Architects & Planners</title>
+  <style>
+    /* ===== Apple 浅色风格 Design Tokens ===== */
+    :root {
+      --blue: #007aff;
+      --blue-hover: #0a84ff;
+      --blue-pressed: #0066d6;
+      --bg: #f5f5f7;
+      --surface: #ffffff;
+      --surface-alt: #f2f2f7;
+      --text: #1d1d1f;
+      --text-secondary: #6e6e73;
+      --text-tertiary: #86868b;
+      --separator: #e5e5ea;
+      --separator-opaque: #d1d1d6;
+      --red: #ff3b30;
+      --green: #34c759;
+      --orange: #ff9500;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Helvetica Neue", "Segoe UI", sans-serif;
+      font-size: 13px;
+      font-weight: 400;
+      overflow: hidden;
+      height: 100vh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ===== 顶部工具条 ===== */
+    #topbar {
+      background: var(--surface);
+      border-bottom: 0.5px solid var(--separator);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 12px;
+    }
+    #topbar .group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-right: 16px;
+      border-right: 0.5px solid var(--separator);
+    }
+    #topbar .group:last-child { border-right: none; }
+    #topbar label { color: var(--text-tertiary); font-size: 11px; font-weight: 500; }
+    #topbar select, #topbar input[type=number] {
+      background: var(--surface-alt);
+      border: 0.5px solid var(--separator-opaque);
+      color: var(--text);
+      padding: 5px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+    #topbar select:focus, #topbar input[type=number]:focus {
+      border-color: var(--blue);
+    }
+    #topbar input[type=number] { width: 52px; }
+    #topbar button {
+      padding: 6px 14px;
+      background: var(--surface-alt);
+      border: none;
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      font-weight: 500;
+      transition: all .15s;
+    }
+    #topbar button:hover { background: var(--separator); }
+    #topbar button.active {
+      background: var(--blue);
+      color: #fff;
+    }
+    #topbar .preset-btn.active {
+      background: var(--blue);
+      color: #fff;
+    }
+    #topbar .scale-readout {
+      color: var(--text-tertiary);
+      font-size: 11px;
+    }
+
+    /* ===== 主体 ===== */
+    #main { flex: 1; display: flex; overflow: hidden; }
+    #canvas-wrap { flex: 1; position: relative; }
+    canvas { display: block; }
+
+    /* ===== 左侧工具栏 ===== */
+    #toolbar {
+      width: 168px;
+      background: var(--surface);
+      border-right: 0.5px solid var(--separator);
+      padding: 14px 8px;
+      overflow-y: auto;
+    }
+    #toolbar h3 {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      text-align: center;
+      margin-bottom: 8px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tool-btn {
+      width: 100%;
+      padding: 8px 6px;
+      margin-bottom: 5px;
+      background: var(--surface-alt);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 11px;
+      text-align: center;
+      transition: all .15s;
+      font-family: inherit;
+      font-weight: 500;
+    }
+    .tool-btn:hover { background: var(--separator); }
+    .tool-btn.active {
+      background: var(--blue);
+      color: #fff;
+    }
+    .brick-btn canvas {
+      background: transparent;
+      display: block;
+      margin: 0 auto 2px;
+    }
+
+    /* ===== 右侧 ===== */
+    #side {
+      width: 180px;
+      background: var(--surface);
+      border-left: 0.5px solid var(--separator);
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow-y: auto;
+    }
+    #side h3 {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      text-align: center;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    #palette {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .color-btn {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: var(--radius-sm);
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all .15s;
+      box-shadow: inset 0 0 0 0.5px var(--separator-opaque);
+    }
+    .color-btn.active { border-color: var(--blue); transform: scale(1.08); box-shadow: 0 0 0 2px rgba(0,122,255,0.2); }
+    .color-btn:hover { transform: scale(1.05); }
+    .action-btn {
+      padding: 8px 6px;
+      background: var(--surface-alt);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 11px;
+      text-align: center;
+      transition: all .15s;
+      font-family: inherit;
+      font-weight: 500;
+    }
+    .action-btn:hover { background: var(--separator); }
+    .action-btn.danger { background: var(--surface-alt); color: var(--red); }
+    .action-btn.danger:hover { background: rgba(255,59,48,0.08); }
+
+    /* 可视化按钮组 */
+    .viz-bar { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+    .viz-btn {
+      flex: 1 1 45%;
+      padding: 6px 0; font-size: 11px;
+      background: var(--surface-alt); border: none; border-radius: var(--radius-sm);
+      color: var(--text-secondary); cursor: pointer; transition: all 0.15s; font-weight: 500;
+    }
+    .viz-btn:hover { background: var(--separator); color: var(--text); }
+    .viz-btn.active { background: var(--blue); color: #fff; }
+    .viz-legend {
+      height: 14px; border-radius: 4px; margin: 6px 0 10px;
+      background: linear-gradient(to right, #ffffff, #e5e5ea, #ff3b30);
+      position: relative;
+    }
+    .viz-legend.green { background: linear-gradient(to right, #ffffff, #34c759); }
+    .viz-legend.density { background: linear-gradient(to right, #ffffff, #ff9500); }
+    .viz-legend::before, .viz-legend::after {
+      content: attr(data-lo); position: absolute; top: -14px; font-size: 9px; color: var(--text-tertiary);
+    }
+    .viz-legend::before { left: 0; }
+    .viz-legend::after { right: 0; }
+
+    /* 指标面板 */
+    .metrics-body {
+      font-size: 11px; line-height: 1.7;
+      background: var(--surface-alt); border-radius: var(--radius-md); padding: 8px 10px;
+      margin-bottom: 8px;
+    }
+    .m-row { display: flex; justify-content: space-between; padding: 1px 0; }
+    .m-row span { color: var(--text-secondary); }
+    .m-row b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .m-row b.warn { color: var(--red); }
+
+    /* 日照面板 */
+    .sun-panel {
+      background: var(--surface-alt);
+      border-radius: var(--radius-md);
+      padding: 8px 10px;
+      margin-bottom: 8px;
+    }
+    .sun-row {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 10px; color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    .sun-row label { width: 42px; flex-shrink: 0; font-weight: 500; }
+    .sun-row input[type=range] { flex: 1; accent-color: var(--blue); }
+    .sun-row select {
+      flex: 1; background: var(--surface); border: none;
+      border-radius: var(--radius-sm); padding: 3px 4px; font-size: 10px;
+      color: var(--text); font-family: inherit;
+    }
+    .sun-row span { width: 38px; text-align: right; font-variant-numeric: tabular-nums; color: var(--blue); font-weight: 600; }
+    .sun-info {
+      margin-top: 4px; padding-top: 4px;
+      border-top: 0.5px solid var(--separator);
+      font-size: 10px; color: var(--text-tertiary); line-height: 1.6;
+    }
+    .sun-info b { color: var(--text); font-weight: 600; }
+    .sun-info .good { color: var(--green); }
+    .sun-info .bad { color: var(--red); }
+
+    /* ===== 底部状态栏 ===== */
+    #statusbar {
+      position: absolute;
+      left: 0; bottom: 0;
+      width: 100%;
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      color: var(--text-secondary);
+      font-size: 11px;
+      padding: 6px 16px 8px;
+      border-top: 0.5px solid var(--separator);
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sb-row {
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+    .sb-metrics {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      gap: 22px;
+    }
+    .sb-metrics b {
+      color: var(--blue);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .sb-metrics b.warn { color: var(--red); }
+    #statusbar b { color: var(--blue); font-weight: 600; }
+    #statusbar .flash { color: var(--orange) !important; }
+
+    /* 触屏工具栏 */
+    #touch-bar {
+      display: none;
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      gap: 10px;
+      z-index: 100;
+    }
+    .tb-btn {
+      padding: 12px 22px;
+      font-size: 15px;
+      border: none;
+      border-radius: 24px;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: var(--shadow-md);
+      color: var(--text);
+      cursor: pointer;
+      min-width: 76px;
+      font-weight: 500;
+      font-family: inherit;
+    }
+    .tb-btn.active {
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(0,122,255,0.3);
+    }
+    .tb-btn:active { transform: scale(0.95); }
+    @media (hover: none) and (pointer: coarse) {
+      #touch-bar { display: flex; }
+    }
+
+    input[type=file] { display: none; }
+
+    /* ===== Welcome Overlay ===== */
+    #welcome {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(245,245,247,0.85);
+      backdrop-filter: blur(20px) saturate(1.8);
+      -webkit-backdrop-filter: blur(20px) saturate(1.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn .35s ease-out;
+    }
+    #welcome.hidden { display: none; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes popIn { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+
+    .welcome-card {
+      width: min(560px, calc(100vw - 40px));
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md), 0 20px 60px rgba(0,0,0,0.12);
+      padding: 36px 40px 28px;
+      animation: popIn .4s ease-out;
+    }
+    .welcome-card h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+      margin-bottom: 4px;
+    }
+    .welcome-card .subtitle {
+      font-size: 14px;
+      color: var(--blue);
+      font-weight: 500;
+      margin-bottom: 18px;
+    }
+    .welcome-card .tagline {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      margin-bottom: 22px;
+    }
+    .welcome-card h2 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+    }
+    .welcome-card .features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 22px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 16px;
+    }
+    .welcome-card .features li {
+      font-size: 13px;
+      color: var(--text);
+      padding: 6px 0;
+      border-bottom: 0.5px solid var(--separator);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .welcome-card .features li:last-child,
+    .welcome-card .features li:nth-last-child(2):nth-child(odd) { border-bottom: none; }
+    .welcome-card .features .ico {
+      width: 22px; height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      background: var(--surface-alt);
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+    }
+    .welcome-card .quickstart {
+      background: var(--surface-alt);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      margin-bottom: 22px;
+    }
+    .welcome-card .quickstart ol {
+      padding-left: 18px;
+      margin: 0;
+    }
+    .welcome-card .quickstart li {
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.7;
+    }
+    .welcome-card .quickstart code {
+      background: var(--surface);
+      border: 0.5px solid var(--separator-opaque);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      color: var(--blue);
+    }
+    .welcome-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .welcome-actions .btn-primary {
+      background: var(--blue);
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: var(--radius-sm);
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .welcome-actions .btn-primary:hover { background: var(--blue-hover); }
+    .welcome-actions .btn-secondary {
+      background: none;
+      border: none;
+      color: var(--text-tertiary);
+      font-size: 12px;
+      font-family: inherit;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      transition: color .15s, background .15s;
+    }
+    .welcome-actions .btn-secondary:hover {
+      color: var(--text-secondary);
+      background: var(--surface-alt);
+    }
+    .welcome-footer {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      text-align: center;
+      margin-top: 18px;
+    }
+    @media (max-width: 520px) {
+      .welcome-card { padding: 28px 22px 22px; }
+      .welcome-card h1 { font-size: 22px; }
+      .welcome-card .features { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== Welcome Overlay ===== -->
+  <div id="welcome">
+    <div class="welcome-card">
+      <h1>Urban Sandbox</h1>
+      <div class="subtitle">v0.1 · A 3D sketchpad for architects & planners</div>
+      <p class="tagline">
+        Sketch building massing, lay out roads and plots, paint green spaces,
+        analyze sunlight, and watch real-time urban metrics update as you design.
+        Think of it as Lego &mdash; but scaled for real cities.
+      </p>
+
+      <h2>What You Can Do</h2>
+      <ul class="features">
+        <li><span class="ico">🧱</span>Stack building blocks (8 sizes, 4 rotations)</li>
+        <li><span class="ico">🛣️</span>Paint roads with brush presets</li>
+        <li><span class="ico">🌿</span>Drop parks &amp; rooftop gardens</li>
+        <li><span class="ico">☀️</span>Run sunlight shading analysis</li>
+        <li><span class="ico">📐</span>Auto-detect plots &amp; compute FAR</li>
+        <li><span class="ico">📊</span>Choropleth density visualisation</li>
+        <li><span class="ico">🔄</span>Undo &middot; Redo &middot; Auto-save</li>
+        <li><span class="ico">📱</span>iPad &amp; touchscreen ready</li>
+      </ul>
+
+      <div class="quickstart">
+        <h2 style="margin-bottom:8px">Quick Start</h2>
+        <ol>
+          <li>Pick a canvas preset (60m &rarr; 640m) at the top</li>
+          <li>Choose a mode: <code>Road</code>, <code>Plot</code>, or <code>Build</code></li>
+          <li>Left-click &amp; drag to place. Right-click &amp; drag to pan.</li>
+          <li>Press <code>R</code> to rotate the current block.</li>
+        </ol>
+      </div>
+
+      <div class="welcome-actions">
+        <button class="btn-primary" id="welcome-start">Start Designing &rarr;</button>
+        <button class="btn-secondary" id="welcome-again">Show this next time</button>
+      </div>
+      <div class="welcome-footer">
+        Built with Three.js &middot; Runs entirely in your browser
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 顶部工具条 ===== -->
+  <div id="topbar">
+    <div class="group">
+      <label>画布预设:</label>
+      <button class="preset-btn" data-w="30" data-h="30" data-m="2">小 (60m×60m)</button>
+      <button class="preset-btn active" data-w="50" data-h="50" data-m="4">中 (200m×200m)</button>
+      <button class="preset-btn" data-w="80" data-h="80" data-m="8">大 (640m×640m)</button>
+    </div>
+    <div class="group">
+      <label>自定义:</label>
+      <input type="number" id="cust-w" min="10" max="200" value="50">
+      <span>×</span>
+      <input type="number" id="cust-h" min="10" max="200" value="50">
+      <label>每格(m):</label>
+      <input type="number" id="cust-m" min="1" max="50" value="4">
+      <button id="cust-apply">应用</button>
+    </div>
+    <div class="group">
+      <label>视角:</label>
+      <button id="view-iso" class="active">等距</button>
+      <button id="view-top">俯视</button>
+    </div>
+    <div class="group">
+      <label>模式:</label>
+      <button id="mode-road">道路</button>
+      <button id="mode-plot" class="active">地块</button>
+      <button id="mode-build">建筑</button>
+    </div>
+    <div class="group">
+      <span class="scale-readout" id="scale-readout"></span>
+    </div>
+  </div>
+
+  <div id="main">
+    <!-- 左侧工具栏 -->
+    <div id="toolbar">
+      <h3 id="tool-title">工具</h3>
+      <div id="tool-list"></div>
+    </div>
+
+    <!-- 中间画布 -->
+    <div id="canvas-wrap">
+      <div id="statusbar">
+        <div class="sb-row">
+          <span>画布: <b id="cur-canvas">50×50</b></span>
+          <span>每格: <b id="cur-meter">4m</b></span>
+          <span>总面积: <b id="cur-area">40000㎡</b></span>
+          <span>道路占比: <b id="cur-road">0%</b></span>
+          <span>地块数: <b id="cur-plots">0</b></span>
+          <span>建筑数: <b id="cur-bricks">0</b></span>
+          <span style="margin-left:auto">已自动保存</span>
+        </div>
+        <div class="sb-row sb-metrics" id="sb-metrics"></div>
+      </div>
+      <!-- 触屏工具栏：仅 iPad/手机显示 -->
+      <div id="touch-bar">
+        <button id="tb-rotate" class="tb-btn" title="双指也可旋转/缩放">↻ 旋转</button>
+        <button id="tb-pan" class="tb-btn" title="开启后单指拖动平移画面">✥ 平移</button>
+        <button id="tb-undo" class="tb-btn" title="撤销 (Ctrl+Z)">↶ 撤销</button>
+        <button id="tb-delete" class="tb-btn" title="切换到拆除模式">✕ 拆除</button>
+      </div>
+    </div>
+
+    <!-- 右侧颜色 + 操作 -->
+    <div id="side">
+      <h3>颜色</h3>
+      <div id="palette"></div>
+      <h3>撤销</h3>
+      <button class="action-btn" id="btn-undo">撤销 (Ctrl+Z)</button>
+      <h3>清除</h3>
+      <button class="action-btn danger" id="btn-clear-build">清建筑</button>
+      <button class="action-btn danger" id="btn-clear-road">清道路</button>
+      <button class="action-btn danger" id="btn-clear-green">清绿地</button>
+      <button class="action-btn danger" id="btn-clear-all">全部清空</button>
+      <h3>操作</h3>
+      <button class="action-btn" id="btn-rotate">旋转 (R)</button>
+      <button class="action-btn" id="btn-redetect">重算地块</button>
+      <button class="action-btn" id="btn-save">导出 JSON</button>
+      <button class="action-btn" id="btn-load">导入 JSON</button>
+      <input type="file" id="file-input" accept=".json,application/json">
+
+      <h3>📊 可视化</h3>
+      <div class="viz-bar">
+        <button class="viz-btn active" data-viz="none">关闭</button>
+        <button class="viz-btn" data-viz="far">容积率</button>
+        <button class="viz-btn" data-viz="density">建筑密度</button>
+        <button class="viz-btn" data-viz="green">绿地率</button>
+      </div>
+      <div class="viz-legend" id="viz-legend"></div>
+
+      <h3>📍 地块指标</h3>
+      <div id="plot-metrics-body" class="metrics-body"><div class="m-row" style="color:#888">点击地块查看指标</div></div>
+
+      <h3>☀️ 日照分析</h3>
+      <div class="sun-panel">
+        <div class="sun-row"><label>纬度</label><input type="range" id="sp-lat" min="-60" max="60" step="0.1" value="23.12"><span id="sp-lat-v">23.12°</span></div>
+        <div class="sun-row"><label>日期</label><select id="sp-date">
+          <option value="80">3月21日 春分</option>
+          <option value="172" selected>6月21日 夏至</option>
+          <option value="266">9月23日 秋分</option>
+          <option value="355">12月22日 冬至</option>
+        </select></div>
+        <div class="sun-row"><label>北方向</label><input type="range" id="sp-north" min="-45" max="45" step="5" value="0"><span id="sp-north-v">0°</span></div>
+        <button class="btn-primary" id="btn-sun" style="margin-top:6px;width:100%">⚡ 计算日照分析</button>
+        <button class="action-btn" id="btn-sun-clear" style="width:100%;margin-top:4px">✕ 清除日照覆盖</button>
+        <div class="sun-info" id="sun-info" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Three.js 本地副本（支持 file:// 直接打开） -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./three/three.module.js",
+      "three/addons/": "./three/"
+    }
+  }
+  </script>
+
+  <script type="module">
+  console.log('UrbanSandbox v0.1 已加载');
+
+  import * as THREE from 'three';
+  import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+  // ===== Welcome overlay toggle =====
+  (function initWelcome() {
+    const WELCOME_KEY = 'urbanSandbox.showWelcome';
+    const el = document.getElementById('welcome');
+    if (!el) return;
+    if (localStorage.getItem(WELCOME_KEY) === 'skip') {
+      el.classList.add('hidden');
+    }
+    const startBtn = document.getElementById('welcome-start');
+    const againBtn = document.getElementById('welcome-again');
+    function hide(skipNext) {
+      el.style.transition = 'opacity .25s';
+      el.style.opacity = '0';
+      if (skipNext) localStorage.setItem(WELCOME_KEY, 'skip');
+      setTimeout(() => el.classList.add('hidden'), 260);
+    }
+    if (startBtn) startBtn.addEventListener('click', () => hide(true));
+    if (againBtn) againBtn.addEventListener('click', () => hide(false));
+    // ESC also closes
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !el.classList.contains('hidden')) hide(true);
+    }, { once: false });
+  })();
+
+  // ============================================================
+  // 1. 配置常量
+  // ============================================================
+  const BRICK_H = 1.2;            // 积木高度
+  const STUD_H = 0.25;
+  const STUD_R = 0.32;
+
+  // 积木类型
+  const BRICK_TYPES = {
+    '1x1':  { w: 1, d: 1 },
+    '1x2':  { w: 1, d: 2 },
+    '2x2':  { w: 2, d: 2 },
+    '1x3':  { w: 1, d: 3 },
+    '2x4':  { w: 2, d: 4 },
+    '3x3':  { w: 3, d: 3 },
+    '2x6':  { w: 2, d: 6 },
+    '4x4':  { w: 4, d: 4 },
+  };
+
+  // 规划专用色板（建筑师版乐高偏向单色 / 暖灰）
+  const COLORS = [
+    { name: '白',  hex: '#ffffff' },
+    { name: '浅灰', hex: '#c8c8c8' },
+    { name: '深灰', hex: '#3a3a3a' },
+    { name: '红',  hex: '#e53935' },
+    { name: '蓝',  hex: '#1e88e5' },
+    { name: '黄',  hex: '#fdd835' },
+    { name: '橙',  hex: '#fb8c00' },
+    { name: '黑',  hex: '#1a1a1a' },
+    { name: '粉',  hex: '#ec407a' },
+    { name: '紫',  hex: '#8e24aa' },
+  ];
+
+  // 地块配色（用于边界与高亮，循环用）
+  const PLOT_COLORS = [
+    0x4d6a4d, 0x4d4d6a, 0x6a4d4d, 0x6a5e4d,
+    0x4d6a6a, 0x6a4d6a, 0x5e6a4d, 0x6a644d,
+  ];
+
+  // ============================================================
+  // 2. 状态
+  // ============================================================
+  let GRID_W = 50, GRID_H = 50, METER_PER_CELL = 4;
+  let HALF_W = GRID_W / 2, HALF_H = GRID_H / 2;
+
+  // 当前模式: 'road' | 'plot' | 'build'
+  let mode = 'plot';
+
+  // 道路格子: Set<"i,k">
+  const roadCells = new Set();
+
+  // 绿地格子: Map<"i,k,layer", layer> —— 支持地面绿地（layer 0）和屋顶绿地（layer N）
+  const greenCells = new Map();
+
+  // 地块格子: Map<"i,k", plotId>; plotId 从 1 开始
+  const plotMap = new Map();
+  let plotCount = 0;
+  let highlightedPlot = null;
+  let plotTool = 'highlight';  // 'highlight' | 'green'
+
+  // 积木: [{ id, type, color, i, k, layer, rotIdx, group }]
+  const bricks = [];
+  let brickIdSeq = 1;
+  const occupancy = new Map(); // "i,k,layer" → brick.id
+  function occKey(i, k, layer) { return i + ',' + k + ',' + layer; }
+
+  let curType = '2x2';
+  let curColor = COLORS[0].hex;
+  let curRot = 0;
+
+  // 建筑模式下的工具：'place' 放积木 | 'remove' 拆积木 | 'move' 移动积木
+  let toolAction = 'place';
+  let movingBrick = null;  // 正在被移动的积木（move 模式）
+
+  // ============================================================
+  // 撤销系统：快照栈
+  // ============================================================
+  const MAX_UNDO = 50;
+  const undoStack = [];   // [{ bricks: [...], roads: [...], brickIdSeq: N }]
+  let suppressUndo = false;  // 快照恢复期间不记录新快照
+  let dragBatchActive = false;  // 道路拖动涂画期间只记录一次快照（开始时）
+
+  function pushUndo() {
+    if (suppressUndo) return;
+    undoStack.push({
+      bricks: bricks.map(b => ({
+        type: b.type, color: b.color,
+        i: b.i, k: b.k, layer: b.layer, rotIdx: b.rotIdx,
+      })),
+      roads: Array.from(roadCells),
+      brickIdSeq: brickIdSeq,
+    });
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
+  }
+
+  function canUndo() { return undoStack.length > 0; }
+
+  function undo() {
+    if (!canUndo()) { flashStatus('没有可撤销的操作'); return; }
+    const snap = undoStack.pop();
+    suppressUndo = true;
+
+    // 清当前状态（但不自动保存，也不记录 undo）
+    for (let idx = bricks.length - 1; idx >= 0; idx--) {
+      scene.remove(bricks[idx].group);
+    }
+    bricks.length = 0;
+    occupancy.clear();
+    roadCells.clear();
+    highlightedPlot = null;
+
+    // 恢复道路
+    for (const key of snap.roads) roadCells.add(key);
+    rebuildRoadLayer();
+
+    // 恢复积木
+    brickIdSeq = snap.brickIdSeq;
+    for (const b of snap.bricks) {
+      if (!BRICK_TYPES[b.type]) continue;
+      // 直接 place（canPlace 在 undo 恢复时可能因 occupancy 冲突失败，手动绕过）
+      const mesh = createBrickMesh(b.type, b.color, b.rotIdx);
+      const fp = getFootprint(b.type, b.rotIdx);
+      const [x, z] = gridToWorld(b.i, b.k);
+      mesh.position.set(
+        x + fp.w / 2 - 0.5,
+        b.layer * BRICK_H,
+        z + fp.d / 2 - 0.5
+      );
+      const rec = {
+        id: brickIdSeq++, type: b.type, color: b.color,
+        i: b.i, k: b.k, layer: b.layer, rotIdx: b.rotIdx, group: mesh,
+      };
+      bricks.push(rec);
+      scene.add(mesh);
+      for (const [ci, ck] of fp.cells) {
+        occupancy.set(occKey(b.i + ci, b.k + ck, b.layer), rec.id);
+      }
+    }
+
+    detectPlots();
+    updateStatus();
+    autoSave();
+    suppressUndo = false;
+    flashStatus('已撤销');
+  }
+
+  // 道路拖动期间的批处理：开始时 push 一次，结束时再 push 一次以记录最终状态
+  function beginDragBatch() {
+    if (!dragBatchActive) {
+      pushUndo();
+      dragBatchActive = true;
+    }
+  }
+  function endDragBatch() {
+    dragBatchActive = false;
+  }
+
+  // 道路笔刷：{ w, d }，中心点为锚点，向四周扩展
+  let brushSize = { w: 1, d: 1 };
+  const BRUSH_PRESETS = [
+    { label: '1格', w: 1, d: 1 },
+    { label: '2格方', w: 2, d: 2 },
+    { label: '3格方', w: 3, d: 3 },
+    { label: '1×3条', w: 1, d: 3 },
+    { label: '2×4条', w: 2, d: 4 },
+    { label: '3×3斜', w: 3, d: 3, rotate: true },  // 点一下旋转方向
+  ];
+
+  // ============================================================
+  // 3. 场景 / 相机 / 渲染器
+  // ============================================================
+  const wrap = document.getElementById('canvas-wrap');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xffffff);
+
+  const aspect = wrap.clientWidth / wrap.clientHeight;
+  let viewSize = computeViewSize();
+  function computeViewSize() {
+    return Math.max(GRID_W, GRID_H) * 0.65 + 4;
+  }
+  const camera = new THREE.OrthographicCamera(
+    -viewSize * aspect, viewSize * aspect,
+    viewSize, -viewSize,
+    0.1, 600
+  );
+  camera.position.set(30, 36, 30);
+  camera.lookAt(0, 4, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  wrap.appendChild(renderer.domElement);
+
+  function refreshOutlineSelection() {
+    // OutlinePass 已废弃，用 EdgesGeometry 直接勾边
+  }
+
+  // 基础光照（不做实时阴影，日照通过一键分析计算）
+  scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.6);
+  keyLight.position.set(20, 30, 12);
+  scene.add(keyLight);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.25);
+  fill.position.set(-10, 12, -8);
+  scene.add(fill);
+
+  // 太阳配置（定义在灯光之前，避免 ReferenceError）
+  let sunConfig = {
+    latitude: 23.12,      // 广州纬度
+    dayOfYear: 172,       // 6月21日（夏至）
+    northAngle: 0,        // 北方向偏离 +Z 的顺时针角度
+    analysisDone: false,  // 是否已做过日照分析
+  };
+  function deg2rad(d) { return d * Math.PI / 180; }
+  // 太阳高度角和方位角（方位角：北=0°，顺时针增加）
+  function computeSunAtHour(hour) {
+    const latRad = deg2rad(sunConfig.latitude);
+    const decl = deg2rad(23.45 * Math.sin(2 * Math.PI * (sunConfig.dayOfYear - 81) / 365));
+    const hourAngle = deg2rad(15 * (hour - 12));
+    const sinAlt = Math.sin(latRad) * Math.sin(decl) + Math.cos(latRad) * Math.cos(decl) * Math.cos(hourAngle);
+    const alt = Math.asin(Math.max(-1, Math.min(1, sinAlt)));
+    let azim = Math.atan2(
+      Math.sin(hourAngle),
+      Math.cos(hourAngle) * Math.sin(latRad) - Math.tan(decl) * Math.cos(latRad)
+    );
+    azim = (azim + 2 * Math.PI) % (2 * Math.PI);
+    return { alt, azim, altDeg: alt * 180 / Math.PI, azimDeg: azim * 180 / Math.PI };
+  }
+  function computeSun() {
+    return computeSunAtHour(sunConfig.hour);
+  }
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.12;
+  controls.minZoom = 0.25;
+  controls.maxZoom = 6;
+  controls.maxPolarAngle = Math.PI * 0.49;
+  // 鼠标键位：左键搭建 / 右键平移 / 中键旋转
+  controls.mouseButtons = {
+    LEFT: null,
+    MIDDLE: THREE.MOUSE.ROTATE,
+    RIGHT: THREE.MOUSE.PAN,
+  };
+  // 触屏手势：单指拖动=搭建(自定义)/双指拖动=旋转/双指捏合=缩放
+  controls.touches = {
+    ONE: null,           // 单指：不拦截，让我们的 pointerdown 处理搭建
+    TWO: THREE.TOUCH.DOLLY_PAN,  // 双指：平移+缩放（pinch）
+  };
+  controls.target.set(0, 4, 0);
+
+  // ============================================================
+  // 4. 地面 + 网格 + 道路层 + 地块层
+  // ============================================================
+  // 三层网格：地面（不透明） + 地块色块层（半透明，按 plotId 着色） + 道路层（深色，每个 roadCell 一块）
+  let ground, gridHelper, edgeLine;
+  const plotLayerGroup = new THREE.Group(); scene.add(plotLayerGroup);
+  const roadLayerGroup = new THREE.Group(); scene.add(roadLayerGroup);
+  const greenLayerGroup = new THREE.Group(); scene.add(greenLayerGroup);
+  const plotBoundaryGroup = new THREE.Group(); scene.add(plotBoundaryGroup);
+
+  // 复用几何/材质
+  const roadGeo = new THREE.BoxGeometry(1, 0.06, 1);
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x4a4a52, roughness: 0.95 });
+  const plotGeo = new THREE.PlaneGeometry(1, 1);
+  plotGeo.rotateX(-Math.PI / 2);
+  const plotMats = PLOT_COLORS.map(c =>
+    new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
+  );
+  const plotHighlightMat = new THREE.MeshBasicMaterial({
+    color: 0xffd700, transparent: true, opacity: 0.5, side: THREE.DoubleSide
+  });
+
+  // 道路标线材质（黄色虚线感，简化为细线）
+  const roadLineMat = new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.4 });
+
+  function rebuildGround() {
+    // 清旧
+    if (ground) { scene.remove(ground); ground = null; }
+    if (gridHelper) { scene.remove(gridHelper); gridHelper = null; }
+    if (edgeLine) { scene.remove(edgeLine); edgeLine = null; }
+
+    HALF_W = GRID_W / 2;
+    HALF_H = GRID_H / 2;
+
+    const groundGeo = new THREE.PlaneGeometry(GRID_W, GRID_H);
+    groundGeo.rotateX(-Math.PI / 2);
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.95, metalness: 0,
+    });
+    ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.position.set(0, 0, 0);
+    ground.name = 'ground';
+    scene.add(ground);
+
+    gridHelper = new THREE.GridHelper(
+      Math.max(GRID_W, GRID_H),
+      Math.max(GRID_W, GRID_H),
+      0x666666, 0xcccccc
+    );
+    gridHelper.position.set(0, 0.01, 0);
+    scene.add(gridHelper);
+
+    const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(GRID_W, 0.05, GRID_H));
+    edgeLine = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: 0x555555 }));
+    edgeLine.position.set(0, 0, 0);
+    scene.add(edgeLine);
+  }
+
+  function gridToWorld(i, k) {
+    return [i + 0.5 - HALF_W, k + 0.5 - HALF_H];
+  }
+  function worldToGridX(x) { return Math.floor(x + HALF_W); }
+  function worldToGridZ(z) { return Math.floor(z + HALF_H); }
+  function inBounds(i, k) { return i >= 0 && i < GRID_W && k >= 0 && k < GRID_H; }
+  function isRoad(i, k) { return roadCells.has(i + ',' + k); }
+
+  // ============================================================
+  // 5. 道路渲染
+  // ============================================================
+  function rebuildRoadLayer() {
+    while (roadLayerGroup.children.length) roadLayerGroup.remove(roadLayerGroup.children[0]);
+    for (const key of roadCells) {
+      const [i, k] = key.split(',').map(Number);
+      const [x, z] = gridToWorld(i, k);
+      const m = new THREE.Mesh(roadGeo, roadMat);
+      m.position.set(x, 0.03, z);
+      roadLayerGroup.add(m);
+    }
+  }
+
+  // 绿地渲染：地面绿地（layer 0）用深绿色，屋顶绿地（layer > 0）用稍亮的绿色薄片
+  const greenGeo = new THREE.BoxGeometry(1, 0.12, 1);
+  const greenRoofGeo = new THREE.BoxGeometry(1, 0.06, 1);  // 屋顶绿地更薄
+  const greenMat = new THREE.MeshLambertMaterial({ color: 0x9ccc65, flatShading: true });
+  const greenRoofMat = new THREE.MeshLambertMaterial({ color: 0xaed581, flatShading: true });
+  function rebuildGreenLayer() {
+    while (greenLayerGroup.children.length) greenLayerGroup.remove(greenLayerGroup.children[0]);
+    for (const [key, layer] of greenCells) {
+      const [i, k] = key.split(',').map(Number);
+      const [x, z] = gridToWorld(i, k);
+      let m;
+      if (layer === 0) {
+        m = new THREE.Mesh(greenGeo, greenMat);
+        m.position.set(x, 0.06, z);
+      } else {
+        m = new THREE.Mesh(greenRoofGeo, greenRoofMat);
+        m.position.set(x, layer * BRICK_H + 0.03, z);
+      }
+      greenLayerGroup.add(m);
+    }
+  }
+
+  // 查询某格在某层是否已有绿地（也查该格任意层的绿地）
+  function hasGreenAt(i, k, layer) {
+    return greenCells.has(i + ',' + k + ',' + layer);
+  }
+  function hasGreenAnyLayer(i, k) {
+    for (const [key] of greenCells) {
+      const [gi, gk] = key.split(',').map(Number);
+      if (gi === i && gk === k) return true;
+    }
+    return false;
+  }
+
+  // 查询某格积木的最高层（用于屋顶绿地放置）
+  function getBrickTopLayer(i, k) {
+    let top = -1;
+    for (const b of bricks) {
+      const fp = getFootprint(b.type, b.rotIdx);
+      if (fp.cells.some(([c, d]) => b.i + c === i && b.k + d === k)) {
+        top = Math.max(top, b.layer);
+      }
+    }
+    return top;
+  }
+
+  function toggleGreen(i, k, forceState, layer) {
+    if (!inBounds(i, k)) return;
+    if (layer === undefined) layer = 0;
+    const key = i + ',' + k + ',' + layer;
+    // 不能在道路上画绿地（layer 0）
+    if (layer === 0 && isRoad(i, k)) { flashStatus('道路上不能画绿地'); return; }
+    const isGreen = greenCells.has(key);
+    const wantGreen = forceState !== undefined ? forceState : !isGreen;
+    if (wantGreen && !isGreen) greenCells.set(key, layer);
+    else if (!wantGreen && isGreen) greenCells.delete(key);
+  }
+
+  // 生成笔刷覆盖的格子列表（相对锚点 i,k 的偏移）
+  function getBrushCells() {
+    const cells = [];
+    const hw = Math.floor(brushSize.w / 2);
+    const hd = Math.floor(brushSize.d / 2);
+    // 锚点为中心，处理奇数/偶数尺寸
+    const iStart = -(brushSize.w - 1 - hw);
+    const iEnd = hw;
+    const kStart = -(brushSize.d - 1 - hd);
+    const kEnd = hd;
+    for (let di = iStart; di <= iEnd; di++) {
+      for (let dk = kStart; dk <= kEnd; dk++) {
+        cells.push([di, dk]);
+      }
+    }
+    return cells;
+  }
+
+  function toggleRoad(i, k, forceState) {
+    const brushCells = getBrushCells();
+    let changed = 0;
+    let blocked = 0;
+    for (const [di, dk] of brushCells) {
+      const ci = i + di, ck = k + dk;
+      if (!inBounds(ci, ck)) continue;
+      const key = ci + ',' + ck;
+      // 不能在已放建筑下加道路
+      const hasBrick = bricks.some(b => {
+        const fp = getFootprint(b.type, b.rotIdx);
+        return fp.cells.some(([c, d]) => b.i + c === ci && b.k + d === ck);
+      });
+      if (hasBrick) { blocked++; continue; }
+      const isRoad = roadCells.has(key);
+      const wantRoad = forceState !== undefined ? forceState : !isRoad;
+      if (wantRoad && !isRoad) { roadCells.add(key); changed++; }
+      else if (!wantRoad && isRoad) { roadCells.delete(key); changed++; }
+    }
+    if (changed === 0 && blocked > 0) flashStatus(`笔刷覆盖 ${blocked} 格被建筑阻挡`);
+  }
+
+  // ============================================================
+  // 6. 地块识别（BFS flood fill）
+  // ============================================================
+  function detectPlots() {
+    plotMap.clear();
+    plotCount = 0;
+    const visited = new Set();
+    let id = 0;
+    for (let i = 0; i < GRID_W; i++) {
+      for (let k = 0; k < GRID_H; k++) {
+        const key = i + ',' + k;
+        if (visited.has(key) || roadCells.has(key)) continue;
+        // BFS
+        id++;
+        const queue = [[i, k]];
+        visited.add(key);
+        while (queue.length) {
+          const [ci, ck] = queue.shift();
+          plotMap.set(ci + ',' + ck, id);
+          for (const [di, dk] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+            const ni = ci + di, nk = ck + dk;
+            if (!inBounds(ni, nk)) continue;
+            const nkey = ni + ',' + nk;
+            if (visited.has(nkey) || roadCells.has(nkey)) continue;
+            visited.add(nkey);
+            queue.push([ni, nk]);
+          }
+        }
+      }
+    }
+    plotCount = id;
+    rebuildPlotLayer();
+    updateStatus();
+  }
+
+  // ============================================================
+  // 城市规划指标计算
+  // ============================================================
+  const RESIDENTIAL_GFA_PER_PERSON = 25;  // 人均住宅建筑面积 25㎡（粗略估算）
+
+  function computeMetrics() {
+    const cellArea = METER_PER_CELL * METER_PER_CELL;
+    const plotCells = plotMap.size;
+    const roadCellCount = roadCells.size;
+    const totalCells = GRID_W * GRID_H;
+    const greenGroundCells = Array.from(greenCells.values()).filter(l => l === 0).length;
+    const greenRoofCells = Array.from(greenCells.values()).filter(l => l > 0).length;
+
+    let gfa = 0;
+    let footprintArea = 0;
+    for (const b of bricks) {
+      const fp = getFootprint(b.type, b.rotIdx);
+      const fpArea = fp.cells.length * cellArea;
+      gfa += fpArea;
+      if (b.layer === 0) footprintArea += fpArea;
+    }
+
+    const plotArea = plotCells * cellArea;
+    const canvasArea = totalCells * cellArea;
+    const roadArea = roadCellCount * cellArea;
+    const greenArea = (greenGroundCells + greenRoofCells) * cellArea;
+
+    return {
+      gfa, plotArea, canvasArea, roadArea, greenArea, footprintArea,
+      far: plotArea > 0 ? gfa / plotArea : 0,
+      buildingDensity: plotArea > 0 ? footprintArea / plotArea : 0,
+      greenRate: plotArea > 0 ? greenArea / plotArea : 0,
+      roadRate: canvasArea > 0 ? roadArea / canvasArea : 0,
+      avgFloors: footprintArea > 0 ? gfa / footprintArea : 0,
+      population: Math.round(gfa / RESIDENTIAL_GFA_PER_PERSON),
+      popDensity: plotArea > 0 ? Math.round((gfa / RESIDENTIAL_GFA_PER_PERSON) / (plotArea / 10000)) : 0,
+      plotCells, roadCells: roadCellCount,
+      greenGroundCells, greenRoofCells,
+    };
+  }
+
+  function computePlotMetrics(pid) {
+    const cellArea = METER_PER_CELL * METER_PER_CELL;
+    const cellSet = new Set();
+    for (const [key, id] of plotMap) { if (id === pid) cellSet.add(key); }
+    if (!cellSet.size) return null;
+    const plotArea = cellSet.size * cellArea;
+
+    let gfa = 0, footprintArea = 0;
+    let greenInPlot = 0;
+    for (const b of bricks) {
+      const fp = getFootprint(b.type, b.rotIdx);
+      if (fp.cells.some(([ci, ck]) => cellSet.has((b.i + ci) + ',' + (b.k + ck)))) {
+        const fpArea = fp.cells.length * cellArea;
+        gfa += fpArea;
+        if (b.layer === 0) footprintArea += fpArea;
+      }
+    }
+    for (const [key] of greenCells) {
+      const [gi, gk] = key.split(',').map(Number);
+      if (cellSet.has(gi + ',' + gk)) greenInPlot++;
+    }
+    const greenArea = greenInPlot * cellArea;
+
+    return {
+      plotArea, gfa, footprintArea, greenArea,
+      far: plotArea > 0 ? gfa / plotArea : 0,
+      buildingDensity: plotArea > 0 ? footprintArea / plotArea : 0,
+      greenRate: plotArea > 0 ? greenArea / plotArea : 0,
+      avgFloors: footprintArea > 0 ? gfa / footprintArea : 0,
+      cells: cellSet.size,
+    };
+  }
+
+  // 地块着色色阶
+  let vizMode = 'none';   // 'none' | 'far' | 'density' | 'green'
+  function farColor(v) {
+    const t = Math.min(v / 10, 1);
+    return new THREE.Color().setHSL(1.0, 0.7, 1 - t * 0.6);  // 白→红
+  }
+  function densityColor(v) {
+    const t = Math.min(v / 0.8, 1);
+    return new THREE.Color().setHSL(0.08, 0.9, 1 - t * 0.7);  // 白→橙
+  }
+  function greenRateColor(v) {
+    const t = Math.min(v / 0.5, 1);
+    return new THREE.Color().setHSL(0.33, 0.7, 1 - t * 0.55);  // 白→绿
+  }
+  function vizColorFor(pid) {
+    if (vizMode === 'none') return null;
+    const pm = computePlotMetrics(pid);
+    if (!pm) return null;
+    if (vizMode === 'far') return farColor(pm.far);
+    if (vizMode === 'density') return densityColor(pm.buildingDensity);
+    if (vizMode === 'green') return greenRateColor(pm.greenRate);
+    return null;
+  }
+
+  function rebuildPlotLayer() {
+    while (plotLayerGroup.children.length) plotLayerGroup.remove(plotLayerGroup.children[0]);
+    while (plotBoundaryGroup.children.length) plotBoundaryGroup.remove(plotBoundaryGroup.children[0]);
+    if (plotCount === 0) return;
+
+    // 给每个 plot 着色：可视化模式用指标色阶，否则用中性浅灰
+    for (const [key, pid] of plotMap) {
+      const [i, k] = key.split(',').map(Number);
+      const [x, z] = gridToWorld(i, k);
+      let mat;
+      if (pid === highlightedPlot) {
+        mat = plotHighlightMat;
+      } else if (vizMode !== 'none') {
+        const c = vizColorFor(pid);
+        mat = new THREE.MeshBasicMaterial({ color: c.getHex(), transparent: true, opacity: 0.45, side: THREE.DoubleSide });
+      } else {
+        // 无可视化：中性浅灰，不干扰画布
+        mat = new THREE.MeshBasicMaterial({ color: 0xf0f0f0, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+      }
+      const m = new THREE.Mesh(plotGeo, mat);
+      m.position.set(x, 0.02, z);
+      plotLayerGroup.add(m);
+    }
+
+    // 画边界：相邻 cell 若 plotId 不同，则画一根线
+    const edgeSet = new Set();
+    for (const [key, pid] of plotMap) {
+      const [i, k] = key.split(',').map(Number);
+      for (const [di, dk, axis] of [[1,0,'v'],[-1,0,'v'],[0,1,'h'],[0,-1,'h']]) {
+        const ni = i + di, nk = k + dk;
+        const nkey = ni + ',' + nk;
+        const npid = plotMap.get(nkey);
+        if (npid !== pid) {
+          // 该方向有边界
+          const [x, z] = gridToWorld(i, k);
+          let x1, z1, x2, z2;
+          if (axis === 'v') {
+            // 竖向边（沿 k 方向）
+            x1 = x2 = x + (di > 0 ? 0.5 : -0.5);
+            z1 = z - 0.5; z2 = z + 0.5;
+          } else {
+            x1 = x - 0.5; x2 = x + 0.5;
+            z1 = z2 = z + (dk > 0 ? 0.5 : -0.5);
+          }
+          const ekey = x1.toFixed(2) + ',' + z1.toFixed(2) + ',' + x2.toFixed(2) + ',' + z2.toFixed(2);
+          if (edgeSet.has(ekey)) continue;
+          edgeSet.add(ekey);
+          const g = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(x1, 0.05, z1),
+            new THREE.Vector3(x2, 0.05, z2),
+          ]);
+          const line = new THREE.Line(g, new THREE.LineBasicMaterial({
+            color: 0xffd700, transparent: true, opacity: 0.65,
+          }));
+          plotBoundaryGroup.add(line);
+        }
+      }
+    }
+  }
+
+  function plotIdAt(i, k) { return plotMap.get(i + ',' + k) || 0; }
+
+  // ============================================================
+  // 7. 积木几何体工厂
+  // ============================================================
+  const studGeo = new THREE.CylinderGeometry(STUD_R, STUD_R, STUD_H, 12);
+  const _colorMats = {};
+  function getColorMat(hex) {
+    if (!_colorMats[hex]) {
+      _colorMats[hex] = new THREE.MeshLambertMaterial({
+        color: hex, flatShading: true,
+      });
+    }
+    return _colorMats[hex];
+  }
+
+  function createBrickMesh(typeKey, hex, rotIdx) {
+    const t = BRICK_TYPES[typeKey];
+    const w = t.w, d = t.d;
+    const group = new THREE.Group();
+    const bodyGeo = new THREE.BoxGeometry(w, BRICK_H, d);
+    const body = new THREE.Mesh(bodyGeo, getColorMat(hex));
+    body.position.y = BRICK_H / 2;
+    body.renderOrder = 0;
+    group.add(body);
+
+    // 反转壳层勾边：放大 1.02× + BackSide + 深色 + depthTest:true
+    // 原理：壳层先渲染（renderOrder=-1），主体后渲染覆盖它
+    // 只有壳层伸出主体边缘的部分可见 = 外轮廓
+    // 相邻积木：A的壳层在接触面被B的主体覆盖，B的壳层被A覆盖 → 接触面不出线
+    const _hullMat = new THREE.MeshBasicMaterial({
+      color: 0x333333, side: THREE.BackSide,
+    });
+    const hullGeo = new THREE.BoxGeometry(w * 1.02, BRICK_H * 1.02, d * 1.02);
+    const hull = new THREE.Mesh(hullGeo, _hullMat);
+    hull.position.y = BRICK_H / 2;
+    hull.renderOrder = -1;  // 关键：先渲染壳层，主体后覆盖
+    group.add(hull);
+
+    for (let ix = 0; ix < w; ix++) {
+      for (let iz = 0; iz < d; iz++) {
+        const stud = new THREE.Mesh(studGeo, getColorMat(hex));
+        stud.position.set(-w/2 + ix + 0.5, BRICK_H + STUD_H/2, -d/2 + iz + 0.5);
+        stud.renderOrder = 0;
+        group.add(stud);
+        // 圆柱也加反转壳层勾边，放大率更小 = 更细
+        const studHullGeo = new THREE.CylinderGeometry(STUD_R * 1.06, STUD_R * 1.06, STUD_H * 1.03, 12);
+        const studHull = new THREE.Mesh(studHullGeo, _hullMat);
+        studHull.position.copy(stud.position);
+        studHull.renderOrder = -1;
+        group.add(studHull);
+      }
+    }
+    group.rotation.y = rotIdx * Math.PI / 2;
+    group.userData.isBrick = true;
+    body.userData.parentGroup = group;
+    return group;
+  }
+
+  function getFootprint(typeKey, rotIdx) {
+    const t = BRICK_TYPES[typeKey];
+    let w = t.w, d = t.d;
+    if (rotIdx % 2 === 1) { [w, d] = [d, w]; }
+    const cells = [];
+    for (let i = 0; i < w; i++)
+      for (let k = 0; k < d; k++)
+        cells.push([i, k]);
+    return { w, d, cells };
+  }
+
+  // ============================================================
+  // 8. 放置/删除建筑
+  // ============================================================
+  function canPlace(typeKey, rotIdx, anchorI, anchorK, layer) {
+    const fp = getFootprint(typeKey, rotIdx);
+    for (const [ci, ck] of fp.cells) {
+      const i = anchorI + ci;
+      const k = anchorK + ck;
+      if (!inBounds(i, k)) return false;
+      if (isRoad(i, k)) return false;  // 不能在道路上建
+      if (hasGreenAt(i, k, layer)) return false;  // 不能在同层绿地上建（地面绿地=0层，屋顶绿地=N层）
+      if (occupancy.has(occKey(i, k, layer))) return false;
+      // 注意：允许悬空——建筑师推敲体量时悬挑是刚需
+    }
+    return true;
+  }
+
+  function placeBrick(typeKey, hex, rotIdx, anchorI, anchorK, layer) {
+    const mesh = createBrickMesh(typeKey, hex, rotIdx);
+    const [x, z] = gridToWorld(anchorI, anchorK);
+    const fp = getFootprint(typeKey, rotIdx);
+    mesh.position.set(
+      x + fp.w / 2 - 0.5,
+      layer * BRICK_H,
+      z + fp.d / 2 - 0.5
+    );
+    const rec = {
+      id: brickIdSeq++, type: typeKey, color: hex,
+      i: anchorI, k: anchorK, layer, rotIdx, group: mesh,
+    };
+    bricks.push(rec);
+    scene.add(mesh);
+    refreshOutlineSelection();
+    for (const [ci, ck] of fp.cells) {
+      occupancy.set(occKey(anchorI + ci, anchorK + ck, layer), rec.id);
+    }
+    updateStatus();
+    autoSave();
+    return rec;
+  }
+
+  // 临时从 occupancy 中移除积木（用于移动时检查新位置）
+  function removeBrickFromOccupancy(brick) {
+    const fp = getFootprint(brick.type, brick.rotIdx);
+    const saved = [];
+    for (const [ci, ck] of fp.cells) {
+      const key = occKey(brick.i + ci, brick.k + ck, brick.layer);
+      saved.push([key, occupancy.get(key)]);
+      occupancy.delete(key);
+    }
+    return saved;
+  }
+  function restoreBrickToOccupancy(saved) {
+    for (const [key, val] of saved) {
+      if (val !== undefined) occupancy.set(key, val);
+    }
+  }
+
+  function removeBrick(brick) {
+    const fp = getFootprint(brick.type, brick.rotIdx);
+    for (const [ci, ck] of fp.cells) {
+      occupancy.delete(occKey(brick.i + ci, brick.k + ck, brick.layer));
+    }
+    scene.remove(brick.group);
+    for (let idx = bricks.length - 1; idx >= 0; idx--) {
+      if (bricks[idx].id === brick.id) { bricks.splice(idx, 1); break; }
+    }
+    refreshOutlineSelection();
+    // 清理失去支撑的屋顶绿地：逐格检查，若该格最高层积木 < 屋顶绿地 layer - 1，则删掉绿地
+    const greensToDelete = [];
+    for (const [key, layer] of greenCells) {
+      if (layer === 0) continue;  // 地面绿地不需要支撑
+      const [gi, gk] = key.split(',').map(Number);
+      const top = getBrickTopLayer(gi, gk);
+      if (top < layer - 1) greensToDelete.push(key);
+    }
+    for (const k of greensToDelete) greenCells.delete(k);
+    if (greensToDelete.length) rebuildGreenLayer();
+    updateStatus();
+    autoSave();
+  }
+
+  function clearBuildings() {
+    for (let idx = bricks.length - 1; idx >= 0; idx--) {
+      scene.remove(bricks[idx].group);
+    }
+    bricks.length = 0;
+    occupancy.clear();
+    // 所有屋顶绿地失去支撑，清理掉；地面绿地保留
+    const roofGreens = [];
+    for (const [key, layer] of greenCells) {
+      if (layer > 0) roofGreens.push(key);
+    }
+    for (const k of roofGreens) greenCells.delete(k);
+    if (roofGreens.length) rebuildGreenLayer();
+    updateStatus();
+    autoSave();
+  }
+
+  function clearRoads() {
+    roadCells.clear();
+    rebuildRoadLayer();
+    detectPlots();   // 道路变了，地块必须重算
+    autoSave();
+  }
+
+  function clearGreens() {
+    greenCells.clear();
+    rebuildGreenLayer();
+    autoSave();
+  }
+
+  function clearAll() {
+    clearBuildings();
+    clearRoads();
+    greenCells.clear();
+    rebuildGreenLayer();
+    highlightedPlot = null;
+    autoSave();
+  }
+
+  // ============================================================
+  // 9. Raycaster + 交互
+  // ============================================================
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  let previewMesh = null;
+  let previewValid = true;
+  let hoveredBrick = null;
+  let hoveredCellKey = null;   // "i,k" for road/green remove mode
+
+  // 通用 cell 高亮：在指定格子位置画金色外轮廓（用于道路/绿地删除模式悬停提示）
+  let cellHighlightLines = null;
+  function setCellHighlight(i, k, on, y = 0.06, h = 0.12) {
+    if (on) {
+      if (cellHighlightLines) {
+        const [oi, ok] = cellHighlightLines.userData.key.split(',').map(Number);
+        if (oi === i && ok === k) return;  // 同一个格子，不用重画
+        scene.remove(cellHighlightLines);
+        cellHighlightLines.geometry.dispose();
+      }
+      const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.02, h * 1.01, 1.02));
+      const lines = new THREE.LineSegments(edgeGeo, _hlMat);
+      const [x, z] = gridToWorld(i, k);
+      lines.position.set(x, y + h / 2, z);
+      lines.renderOrder = 999;
+      lines.userData.key = i + ',' + k;
+      scene.add(lines);
+      cellHighlightLines = lines;
+    } else {
+      if (cellHighlightLines) {
+        scene.remove(cellHighlightLines);
+        cellHighlightLines.geometry.dispose();
+        cellHighlightLines = null;
+      }
+    }
+  }
+
+  // 笔刷预览（道路模式下跟随鼠标的彩色方框）
+  let brushPreviewGroup = null;
+  const brushEdgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 0.08, 1));
+  const brushEdgeMat = new THREE.LineBasicMaterial({
+    color: 0xffd700, transparent: true, opacity: 0.7,
+  });
+
+  const previewMat = new THREE.MeshStandardMaterial({
+    color: curColor, transparent: true, opacity: 0.4,
+    roughness: 0.4, metalness: 0.1,
+  });
+
+  function rebuildPreview() {
+    if (previewMesh) {
+      scene.remove(previewMesh);
+      previewMesh.traverse(o => { if (o.isMesh) o.material = previewMat; });
+    }
+    previewMesh = createBrickMesh(curType, curColor, curRot);
+    previewMesh.traverse(o => {
+      if (o.isMesh) {
+        o.material = previewMat;
+        o.userData.parentGroup = previewMesh;
+      }
+    });
+    previewMesh.userData.isPreview = true;
+    previewMat.color.set(curColor);
+    previewMesh.visible = false;
+    scene.add(previewMesh);
+  }
+  rebuildPreview();
+
+  // 笔刷预览重建（改变 brushSize 时调用）
+  function rebuildBrushPreview() {
+    if (brushPreviewGroup) {
+      scene.remove(brushPreviewGroup);
+      brushPreviewGroup.traverse(o => {
+        if (o.isMesh || o.isLineSegments) o.geometry.dispose();
+      });
+    }
+    brushPreviewGroup = new THREE.Group();
+    const cells = getBrushCells();
+    const [hw, hd] = [Math.floor(brushSize.w / 2), Math.floor(brushSize.d / 2)];
+    const offsetI = -(brushSize.w - 1 - hw);
+    const offsetK = -(brushSize.d - 1 - hd);
+    for (const [di, dk] of cells) {
+      const line = new THREE.LineSegments(brushEdgeGeo, brushEdgeMat);
+      // 锚点 cell 中心世界偏移：(di - offsetI) 得到相对 brush 左上角的格子序号
+      const localI = di - offsetI;
+      const localK = dk - offsetK;
+      line.position.set(localI + 0.5 - brushSize.w / 2, 0.06, localK + 0.5 - brushSize.d / 2);
+      brushPreviewGroup.add(line);
+    }
+    brushPreviewGroup.visible = false;
+    scene.add(brushPreviewGroup);
+  }
+  rebuildBrushPreview();
+
+  function getRaycastTargets() {
+    const arr = [ground];
+    for (const b of bricks) arr.push(b.group);
+    return arr;
+  }
+
+  // 命中点 → { i, k, layer }
+  function computePlacement(intersects) {
+    if (!intersects.length) return null;
+    const hit = intersects[0];
+    const obj = hit.object;
+    const point = hit.point;
+    if (obj === ground) {
+      return { i: worldToGridX(point.x), k: worldToGridZ(point.z), layer: 0 };
+    }
+    let group = obj.userData.parentGroup || obj;
+    const brick = bricks.find(b => b.group === group);
+    if (!brick) return null;
+    const i = worldToGridX(point.x);
+    const k = worldToGridZ(point.z);
+    let layer = brick.layer;
+    const n = hit.face ? hit.face.normal : null;
+    if (n) {
+      const worldN = n.clone().transformDirection(obj.matrixWorld).normalize();
+      if (worldN.y > 0.5) layer = brick.layer + 1;
+    }
+    return { i, k, layer };
+  }
+
+  let dragStart = null;
+  let didDrag = false;
+  let dragMode = null;   // 已废弃，保留兼容
+
+  function onPointerMove(e) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    // 道路模式：拖动涂路/擦路（放置模式只左键，删除模式也只左键）
+    if (dragStart && mode === 'road' && dragStart.button === 0) {
+      const p = pickCell();
+      if (p) {
+        if (toolAction === 'remove') {
+          // 删除模式：擦除笔刷覆盖的道路格子
+          const cells = getBrushCells();
+          for (const [ci, ck] of cells) {
+            const ti = p.i + ci, tk = p.k + ck;
+            toggleRoad(ti, tk, false);
+          }
+        } else {
+          toggleRoad(p.i, p.k, true);
+        }
+        rebuildRoadLayer();
+      }
+    }
+
+    // 地块-绿地模式：拖动连续画绿地（放置模式）或擦绿地（删除模式）
+    if (dragStart && mode === 'plot' && plotTool === 'green' && dragStart.button === 0) {
+      const gt = pickGreenTarget();
+      if (gt) {
+        if (toolAction === 'remove') {
+          // 删除该格所有层的绿地
+          for (const [key, layer] of greenCells) {
+            const [gi, gk] = key.split(',').map(Number);
+            if (gi === gt.i && gk === gt.k) greenCells.delete(key);
+          }
+        } else {
+          // 放置：地面/建筑顶面
+          if (gt.layer === 0 && isRoad(gt.i, gt.k)) return;
+          if (gt.layer > 0 && occupancy.has(occKey(gt.i, gt.k, gt.layer))) return;
+          toggleGreen(gt.i, gt.k, true, gt.layer);
+        }
+        rebuildGreenLayer();
+      }
+    }
+
+    updatePreview();
+  }
+
+  function pickCell() {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects([ground], false);
+    if (!intersects.length) return null;
+    const p = intersects[0].point;
+    return { i: worldToGridX(p.x), k: worldToGridZ(p.z) };
+  }
+
+  // 绿地放置目标：返回 { i, k, layer } —— 地面 layer 0，建筑顶面 top+1
+  function pickGreenTarget() {
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(getRaycastTargets(), true);
+    if (!intersects.length) return null;
+    const hit = intersects[0];
+    const point = hit.point;
+    if (hit.object === ground) {
+      return { i: worldToGridX(point.x), k: worldToGridZ(point.z), layer: 0 };
+    }
+    // 命中积木：找到该格最高层积木，绿地放在 top+1
+    let group = hit.object.userData.parentGroup || hit.object;
+    const brick = bricks.find(b => b.group === group);
+    if (!brick) return null;
+    const i = brick.i + Math.round((point.x - brick.group.position.x) / 1 - 0.5);
+    const k = brick.k + Math.round((point.z - brick.group.position.z) / 1 - 0.5);
+    // 用 worldToGrid 更准
+    const gi = worldToGridX(point.x);
+    const gk = worldToGridZ(point.z);
+    const top = getBrickTopLayer(gi, gk);
+    return { i: gi, k: gk, layer: top + 1 };
+  }
+
+  function updatePreview() {
+    // 先隐藏所有预览
+    previewMesh.visible = false;
+    if (brushPreviewGroup) brushPreviewGroup.visible = false;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    if (mode === 'road') {
+      const intersects = raycaster.intersectObjects([ground], false);
+      if (!intersects.length) {
+        brushPreviewGroup.visible = false;
+        if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+        return;
+      }
+      const p = intersects[0].point;
+      const i = worldToGridX(p.x);
+      const k = worldToGridZ(p.z);
+      const [x, z] = gridToWorld(i, k);
+
+      if (toolAction === 'remove') {
+        // 道路删除模式：悬停高亮道路格子
+        brushPreviewGroup.visible = false;
+        const key = i + ',' + k;
+        if (roadCells.has(key)) {
+          if (hoveredCellKey !== key) {
+            hoveredCellKey = key;
+            setCellHighlight(i, k, true, 0.03, 0.06);  // 道路 y=0.03 高度 0.06
+          }
+        } else {
+          if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+        }
+      } else {
+        // 道路放置模式：显示笔刷预览
+        if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+        brushPreviewGroup.position.set(x, 0, z);
+        brushPreviewGroup.visible = true;
+      }
+      return;
+    }
+
+    if (mode === 'plot' && plotTool === 'green') {
+      const gt = pickGreenTarget();
+      if (!gt) {
+        if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+        return;
+      }
+      const key = gt.i + ',' + gt.k;
+
+      if (toolAction === 'remove') {
+        // 绿地删除模式：悬停高亮该格任意层的绿地
+        const hasAny = hasGreenAnyLayer(gt.i, gt.k);
+        if (hasAny) {
+          if (hoveredCellKey !== key) {
+            hoveredCellKey = key;
+            if (gt.layer === 0) {
+              setCellHighlight(gt.i, gt.k, true, 0.06, 0.12);
+            } else {
+              setCellHighlight(gt.i, gt.k, true, gt.layer * BRICK_H, 0.06);
+            }
+          }
+        } else {
+          if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+        }
+      } else {
+        if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+      }
+      return;
+    }
+
+    // 其他模式：清除 cell 高亮
+    if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+
+    if (mode !== 'build') return;
+
+    if (toolAction === 'remove') {
+      // 删除模式：检测悬停积木并高亮轮廓
+      previewMesh.visible = false;
+      const intersects = raycaster.intersectObjects(getRaycastTargets(), true);
+      const hit = intersects.find(h => h.object !== ground);
+      let newHovered = null;
+      if (hit) {
+        const group = hit.object.userData.parentGroup || hit.object;
+        newHovered = bricks.find(b => b.group === group) || null;
+      }
+      // 切换高亮
+      if (newHovered !== hoveredBrick) {
+        if (hoveredBrick) setBrickHighlight(hoveredBrick, false);
+        hoveredBrick = newHovered;
+        if (hoveredBrick) setBrickHighlight(hoveredBrick, true);
+      }
+      return;
+    }
+
+    if (toolAction === 'move' && movingBrick) {
+      // 移动模式：preview 跟随鼠标，显示 movingBrick 的形状和类型
+      const intersects = raycaster.intersectObjects(getRaycastTargets(), true);
+      const p = computePlacement(intersects);
+      previewMesh.visible = !!p;
+      if (!p) return;
+      const fp = getFootprint(movingBrick.type, movingBrick.rotIdx);
+      const ok = canPlace(movingBrick.type, movingBrick.rotIdx, p.i, p.k, p.layer);
+      previewValid = ok;
+      const [x, z] = gridToWorld(p.i, p.k);
+      previewMesh.position.set(
+        x + fp.w / 2 - 0.5,
+        p.layer * BRICK_H,
+        z + fp.d / 2 - 0.5
+      );
+      previewMesh.rotation.y = movingBrick.rotIdx * Math.PI / 2;
+      previewMat.color.set(ok ? movingBrick.color : '#ff3030');
+      if (hoveredBrick) { setBrickHighlight(hoveredBrick, false); hoveredBrick = null; }
+      return;
+    }
+
+    if (toolAction === 'move' && !movingBrick) {
+      // move 模式但还没选中积木：悬停高亮可移动的积木
+      previewMesh.visible = false;
+      const intersects = raycaster.intersectObjects(getRaycastTargets(), true);
+      const hit = intersects.find(h => h.object !== ground);
+      let newHovered = null;
+      if (hit) {
+        const group = hit.object.userData.parentGroup || hit.object;
+        newHovered = bricks.find(b => b.group === group) || null;
+      }
+      if (newHovered !== hoveredBrick) {
+        if (hoveredBrick) setBrickHighlight(hoveredBrick, false);
+        hoveredBrick = newHovered;
+        if (hoveredBrick) setBrickHighlight(hoveredBrick, true);
+      }
+      return;
+    }
+
+    const intersects = raycaster.intersectObjects(getRaycastTargets(), true);
+    const p = computePlacement(intersects);
+    if (!p) { return; }
+    const ok = canPlace(curType, curRot, p.i, p.k, p.layer);
+    previewValid = ok;
+    const fp = getFootprint(curType, curRot);
+    const [x, z] = gridToWorld(p.i, p.k);
+    previewMesh.position.set(
+      x + fp.w / 2 - 0.5,
+      p.layer * BRICK_H,
+      z + fp.d / 2 - 0.5
+    );
+    previewMesh.visible = true;
+    previewMat.color.set(ok ? curColor : '#ff3030');
+    if (hoveredBrick) { setBrickHighlight(hoveredBrick, false); hoveredBrick = null; }
+  }
+
+  // 外轮廓高亮：线框独立加到 scene，手动算世界坐标避免 group 旋转继承问题
+  const _hlMat = new THREE.LineBasicMaterial({ color: 0xffd700, depthTest: false });
+  function setBrickHighlight(brick, on) {
+    if (on) {
+      if (brick.userData.highlightEdge) return;
+      // 用原始 w/d，不交换——旋转由 worldPos 里的 quaternion 处理
+      const t = BRICK_TYPES[brick.type];
+      const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(t.w * 1.01, BRICK_H * 1.01, t.d * 1.01));
+      const edgeLines = new THREE.LineSegments(edgeGeo, _hlMat);
+      // 世界坐标：brick.group.position + 主体偏移 + 旋转
+      const worldPos = brick.group.position.clone();
+      worldPos.y += BRICK_H / 2;
+      edgeLines.position.copy(worldPos);
+      edgeLines.quaternion.copy(brick.group.quaternion);
+      edgeLines.renderOrder = 999;
+      scene.add(edgeLines);
+      brick.userData.highlightEdge = edgeLines;
+    } else {
+      const lines = brick.userData.highlightEdge;
+      if (!lines) return;
+      scene.remove(lines);
+      lines.geometry.dispose();
+      brick.userData.highlightEdge = null;
+    }
+  }
+
+  renderer.domElement.addEventListener('pointermove', onPointerMove);
+  renderer.domElement.addEventListener('pointerdown', (e) => {
+    dragStart = { x: e.clientX, y: e.clientY, button: e.button };
+    didDrag = false;
+    // 左键拖动批处理：道路放置/删除、绿地放置/删除
+    if (e.button === 0) {
+      if (mode === 'road' || (mode === 'plot' && plotTool === 'green')) {
+        beginDragBatch();
+      }
+    }
+  });
+  renderer.domElement.addEventListener('pointermove', (e) => {
+    if (dragStart) {
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+      if (Math.hypot(dx, dy) > 4) didDrag = true;
+    }
+  });
+  renderer.domElement.addEventListener('pointerup', (e) => {
+    if (!dragStart) return;
+    const btn = dragStart.button;
+    const wasDrag = didDrag;
+    dragStart = null;
+    const wasDragMode = dragMode;
+    dragMode = null;
+    if (wasDrag) {
+      // 道路/绿地拖完，重算地块 + 结束批处理
+      if (mode === 'road') {
+        detectPlots();
+        endDragBatch();
+      } else if (mode === 'plot' && plotTool === 'green') {
+        endDragBatch();
+      }
+      return;
+    }
+
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(getRaycastTargets(), true);
+
+    if (btn === 0) {
+      if (mode === 'road') {
+        const p = pickCell();
+        if (!p) return;
+        if (toolAction === 'remove') {
+          // 删除模式：删掉笔刷覆盖下的道路格子
+          const cells = getBrushCells();
+          let deleted = 0;
+          pushUndo();
+          for (const [ci, ck] of cells) {
+            const ti = p.i + ci, tk = p.k + ck;
+            if (roadCells.has(ti + ',' + tk)) {
+              toggleRoad(ti, tk, false);
+              deleted++;
+            }
+          }
+          if (deleted === 0) flashStatus('没点到道路');
+        } else {
+          // 放置模式：笔刷涂路
+          pushUndo();
+          toggleRoad(p.i, p.k);
+        }
+        rebuildRoadLayer();
+        detectPlots();
+      } else if (mode === 'plot') {
+        const p = pickCell();
+        if (plotTool === 'highlight') {
+          if (p) {
+            const pid = plotIdAt(p.i, p.k);
+            if (pid > 0) {
+              highlightedPlot = (highlightedPlot === pid) ? null : pid;
+              rebuildPlotLayer();
+              updateStatus();
+            } else {
+              flashStatus('该格是道路，无地块');
+            }
+          }
+        } else if (plotTool === 'green') {
+          if (toolAction === 'remove') {
+            // 删除模式：删除该格（任意层）的绿地
+            const gt = pickGreenTarget();
+            if (gt) {
+              // 删除该格所有层的绿地
+              const keysToDelete = [];
+              for (const [key, layer] of greenCells) {
+                const [gi, gk] = key.split(',').map(Number);
+                if (gi === gt.i && gk === gt.k) keysToDelete.push(key);
+              }
+              if (keysToDelete.length) {
+                pushUndo();
+                for (const k of keysToDelete) greenCells.delete(k);
+                rebuildGreenLayer();
+                autoSave();
+              } else {
+                flashStatus('没点到绿地');
+              }
+            }
+          } else {
+            // 放置模式：地面或建筑顶面
+            const gt = pickGreenTarget();
+            if (!gt) return;
+            // 地面绿地约束：不能在道路上
+            if (gt.layer === 0 && isRoad(gt.i, gt.k)) { flashStatus('道路上不能画绿地'); return; }
+            // 建筑顶面约束：该层不能已有建筑或绿地
+            if (gt.layer > 0 && occupancy.has(occKey(gt.i, gt.k, gt.layer))) { flashStatus('该层已有建筑'); return; }
+            if (hasGreenAt(gt.i, gt.k, gt.layer)) { flashStatus('该层已有绿地'); return; }
+            pushUndo();
+            toggleGreen(gt.i, gt.k, true, gt.layer);
+            rebuildGreenLayer();
+            autoSave();
+          }
+        }
+      } else if (mode === 'build') {
+        if (toolAction === 'remove') {
+          // 删除模式：点击积木即删
+          const hit = intersects.find(h => h.object !== ground);
+          if (hit) {
+            const group = hit.object.userData.parentGroup || hit.object;
+            const brick = bricks.find(b => b.group === group);
+            if (brick) { pushUndo(); removeBrick(brick); }
+            else { flashStatus('没点到积木'); }
+          } else {
+            flashStatus('没点到积木');
+          }
+        } else if (toolAction === 'move') {
+          // 移动模式
+          if (movingBrick) {
+            // 正在移动 → 点击放下
+            const p = computePlacement(intersects);
+            if (p) {
+              // 检查新位置是否合法（临时把 movingBrick 从 occupancy 里移除再检查）
+              const tmpRec = removeBrickFromOccupancy(movingBrick);
+              const fp = getFootprint(movingBrick.type, movingBrick.rotIdx);
+              // 移动时保持 rotIdx 不变，用当前积木的类型和旋转
+              const ok = canPlace(movingBrick.type, movingBrick.rotIdx, p.i, p.k, p.layer);
+              if (ok) {
+                pushUndo();
+                // 更新积木位置数据
+                movingBrick.i = p.i;
+                movingBrick.k = p.k;
+                movingBrick.layer = p.layer;
+                const [x, z] = gridToWorld(p.i, p.k);
+                movingBrick.group.position.set(
+                  x + fp.w / 2 - 0.5,
+                  p.layer * BRICK_H,
+                  z + fp.d / 2 - 0.5
+                );
+                // 重新写入 occupancy
+                for (const [ci, ck] of fp.cells) {
+                  occupancy.set(occKey(p.i + ci, p.k + ck, p.layer), movingBrick.id);
+                }
+                movingBrick.group.visible = true;
+                movingBrick = null;
+                refreshOutlineSelection();
+                updateStatus();
+                autoSave();
+              } else {
+                // 放不下 → 恢复 occupancy，取消移动
+                restoreBrickToOccupancy(tmpRec);
+                movingBrick.group.visible = true;
+                movingBrick = null;
+                flashStatus('放不下：越界/重叠/道路/缺支撑');
+              }
+            } else {
+              // 没点到有效位置 → 取消移动
+              movingBrick.group.visible = true;
+              movingBrick = null;
+            }
+          } else {
+            // 没在移动 → 点击积木开始移动
+            const hit = intersects.find(h => h.object !== ground);
+            if (hit) {
+              const group = hit.object.userData.parentGroup || hit.object;
+              const brick = bricks.find(b => b.group === group);
+              if (brick) {
+                movingBrick = brick;
+                brick.group.visible = false;  // 隐藏原积木，用 preview 显示跟随
+                flashStatus('移动中，点击放下，右键取消');
+              }
+            } else {
+              flashStatus('没点到积木');
+            }
+          }
+        } else {
+          // 放置模式
+          const p = computePlacement(intersects);
+          if (!p) return;
+          if (canPlace(curType, curRot, p.i, p.k, p.layer)) {
+            pushUndo();
+            placeBrick(curType, curColor, curRot, p.i, p.k, p.layer);
+            updatePreview();
+          } else {
+            flashStatus('放不下：越界/重叠/道路/缺支撑');
+          }
+        }
+      }
+    } else if (btn === 2) {
+      // 右键：OrbitControls PAN 平移画面（道路/绿地不再用右键擦除）
+      if (mode === 'build') {
+        // 移动模式下右键取消移动
+        if (toolAction === 'move' && movingBrick) {
+          movingBrick.group.visible = true;
+          movingBrick = null;
+          flashStatus('已取消移动');
+          return;
+        }
+        // 建筑兜底：右键也能删积木（不变）
+        const hit = intersects.find(h => h.object !== ground);
+        if (hit) {
+          const group = hit.object.userData.parentGroup || hit.object;
+          const brick = bricks.find(b => b.group === group);
+          if (brick) {
+            pushUndo();
+            removeBrick(brick);
+          }
+        }
+      } else if (mode === 'plot') {
+        if (plotTool === 'highlight') {
+          // 高亮模式：右键取消高亮
+          if (highlightedPlot) {
+            highlightedPlot = null;
+            rebuildPlotLayer();
+          }
+        }
+        // 绿地模式：右键让 OrbitControls 接管 PAN，不做擦除
+      }
+    }
+  });
+
+  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+  // 键盘
+  window.addEventListener('keydown', (e) => {
+    // Ctrl+Z / Cmd+Z 撤销
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      undo();
+      return;
+    }
+    if (e.key === 'r' || e.key === 'R') {
+      curRot = (curRot + 1) % 4;
+      rebuildPreview();
+      updatePreview();
+    } else if (e.key === '1') setMode('road');
+    else if (e.key === '2') setMode('plot');
+    else if (e.key === '3') setMode('build');
+    else if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (mode === 'build' && hoveredBrick) { pushUndo(); removeBrick(hoveredBrick); hoveredBrick = null; }
+    }
+  });
+
+  // ============================================================
+  // 10. UI
+  // ============================================================
+  function buildTypeButtons() {
+    const list = document.getElementById('tool-list');
+    list.innerHTML = '';
+    if (mode === 'road') {
+      document.getElementById('tool-title').textContent = '道路工具';
+
+      // 放置/删除 切换
+      const toolBar = document.createElement('div');
+      toolBar.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;';
+      const placeBtn = document.createElement('button');
+      placeBtn.className = 'tool-btn' + (toolAction === 'place' ? ' active' : '');
+      placeBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
+      placeBtn.textContent = '🔨 放置';
+      placeBtn.onclick = () => setToolAction('place');
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'tool-btn' + (toolAction === 'remove' ? ' active' : '');
+      removeBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
+      removeBtn.textContent = '🔧 拆除';
+      removeBtn.onclick = () => setToolAction('remove');
+      toolBar.appendChild(placeBtn);
+      toolBar.appendChild(removeBtn);
+      list.appendChild(toolBar);
+
+      if (toolAction === 'place') {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
+        hint.innerHTML = '左键涂路<br>按住拖动连续画';
+        list.appendChild(hint);
+      } else {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
+        hint.innerHTML = '点击删除笔刷覆盖的道路格<br>按住拖动连续擦除';
+        list.appendChild(hint);
+      }
+
+      // 笔刷大小选择
+      const lbl = document.createElement('div');
+      lbl.style.cssText = 'font-size:10px;color:#888;text-align:center;margin:4px 0 2px;letter-spacing:1px;';
+      lbl.textContent = '笔刷大小';
+      list.appendChild(lbl);
+
+      for (let idx = 0; idx < BRUSH_PRESETS.length; idx++) {
+        const preset = BRUSH_PRESETS[idx];
+        const btn = document.createElement('button');
+        btn.className = 'tool-btn' + (brushSize.w === preset.w && brushSize.d === preset.d ? ' active' : '');
+        btn.textContent = preset.label;
+        btn.onclick = () => {
+          brushSize = { w: preset.w, d: preset.d };
+          rebuildBrushPreview();
+          // 更新按钮激活态
+          list.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          flashStatus(`笔刷: ${preset.label}（${preset.w}×${preset.d}）`);
+          updatePreview();
+        };
+        list.appendChild(btn);
+      }
+    } else if (mode === 'plot') {
+      document.getElementById('tool-title').textContent = '地块工具';
+      // 子工具切换
+      const toolBar = document.createElement('div');
+      toolBar.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;';
+      const highlightBtn = document.createElement('button');
+      highlightBtn.className = 'tool-btn' + (plotTool === 'highlight' ? ' active' : '');
+      highlightBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
+      highlightBtn.textContent = '🔲 高亮';
+      highlightBtn.onclick = () => { plotTool = 'highlight'; buildTypeButtons(); updateCursor(); };
+      const greenBtn = document.createElement('button');
+      greenBtn.className = 'tool-btn' + (plotTool === 'green' ? ' active' : '');
+      greenBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
+      greenBtn.textContent = '🌿 绿地';
+      greenBtn.onclick = () => { plotTool = 'green'; buildTypeButtons(); updateCursor(); };
+      toolBar.appendChild(highlightBtn);
+      toolBar.appendChild(greenBtn);
+      list.appendChild(toolBar);
+
+      if (plotTool === 'highlight') {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
+        hint.innerHTML = '左键高亮地块<br>右键取消高亮';
+        list.appendChild(hint);
+      } else if (plotTool === 'green') {
+        // 放置/删除 切换
+        const toolBar2 = document.createElement('div');
+        toolBar2.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;';
+        const greenPlaceBtn = document.createElement('button');
+        greenPlaceBtn.className = 'tool-btn' + (toolAction === 'place' ? ' active' : '');
+        greenPlaceBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
+        greenPlaceBtn.textContent = '🔨 放置';
+        greenPlaceBtn.onclick = () => setToolAction('place');
+        const greenRemoveBtn = document.createElement('button');
+        greenRemoveBtn.className = 'tool-btn' + (toolAction === 'remove' ? ' active' : '');
+        greenRemoveBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
+        greenRemoveBtn.textContent = '🔧 拆除';
+        greenRemoveBtn.onclick = () => setToolAction('remove');
+        toolBar2.appendChild(greenPlaceBtn);
+        toolBar2.appendChild(greenRemoveBtn);
+        list.appendChild(toolBar2);
+
+        if (toolAction === 'place') {
+          const hint = document.createElement('div');
+          hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
+          hint.innerHTML = '左键画绿地<br>按住拖动连续画';
+          list.appendChild(hint);
+        } else {
+          const hint = document.createElement('div');
+          hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
+          hint.innerHTML = '点击删除绿地<br>按住拖动连续擦除';
+          list.appendChild(hint);
+        }
+      }
+      const reBtn = document.createElement('button');
+      reBtn.className = 'tool-btn';
+      reBtn.textContent = '重新识别地块';
+      reBtn.onclick = () => { detectPlots(); flashStatus('已重算 ' + plotCount + ' 个地块'); };
+      list.appendChild(reBtn);
+    } else if (mode === 'build') {
+      document.getElementById('tool-title').textContent = '积木';
+      // 放置/移动/拆除 切换
+      const toolBar = document.createElement('div');
+      toolBar.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;';
+      const placeBtn = document.createElement('button');
+      placeBtn.className = 'tool-btn' + (toolAction === 'place' ? ' active' : '');
+      placeBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
+      placeBtn.textContent = '🔨 放置';
+      placeBtn.onclick = () => setToolAction('place');
+      const moveBtn = document.createElement('button');
+      moveBtn.className = 'tool-btn' + (toolAction === 'move' ? ' active' : '');
+      moveBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
+      moveBtn.textContent = '✋ 移动';
+      moveBtn.onclick = () => setToolAction('move');
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'tool-btn' + (toolAction === 'remove' ? ' active' : '');
+      removeBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
+      removeBtn.textContent = '🔧 拆除';
+      removeBtn.onclick = () => setToolAction('remove');
+      toolBar.appendChild(placeBtn);
+      toolBar.appendChild(moveBtn);
+      toolBar.appendChild(removeBtn);
+      list.appendChild(toolBar);
+
+      for (const key of Object.keys(BRICK_TYPES)) {
+        const btn = document.createElement('button');
+        btn.className = 'tool-btn brick-btn' + (key === curType ? ' active' : '');
+        btn.dataset.type = key;
+        const label = document.createElement('div');
+        label.textContent = key.replace('x', '×');
+        const c = document.createElement('canvas');
+        c.width = 70; c.height = 36;
+        btn.appendChild(c);
+        btn.appendChild(label);
+        drawBrickIcon(c, key);
+        btn.onclick = () => {
+          curType = key;
+          document.querySelectorAll('.brick-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.type === key));
+          rebuildPreview();
+          updatePreview();
+        };
+        list.appendChild(btn);
+      }
+    }
+  }
+
+  function drawBrickIcon(canvas, typeKey) {
+    const ctx2 = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    ctx2.clearRect(0, 0, W, H);
+    const t = BRICK_TYPES[typeKey];
+    const cx = W / 2, cy = H / 2 + 4;
+    const u = Math.min(W / (t.w + t.d) * 0.6, H / (t.w + t.d) * 0.6);
+    ctx2.fillStyle = '#9cc';
+    ctx2.strokeStyle = '#fff';
+    ctx2.lineWidth = 1;
+    ctx2.beginPath();
+    ctx2.moveTo(cx, cy - u * t.d);
+    ctx2.lineTo(cx + u * t.w, cy);
+    ctx2.lineTo(cx, cy + u * t.d);
+    ctx2.lineTo(cx - u * t.w, cy);
+    ctx2.closePath();
+    ctx2.fill();
+    ctx2.stroke();
+    ctx2.fillStyle = '#cde';
+    for (let i = 0; i < t.w; i++) {
+      for (let k = 0; k < t.d; k++) {
+        const sx = cx + (i - (t.w-1)/2 - (k-(t.d-1)/2)) * u * 0.6;
+        const sy = cy + (i - (t.w-1)/2 + (k-(t.d-1)/2)) * u * 0.35;
+        ctx2.beginPath();
+        ctx2.arc(sx, sy - 2, 1.6, 0, Math.PI * 2);
+        ctx2.fill();
+      }
+    }
+  }
+
+  function buildPalette() {
+    const pal = document.getElementById('palette');
+    pal.innerHTML = '';
+    for (const c of COLORS) {
+      const b = document.createElement('div');
+      b.className = 'color-btn' + (c.hex === curColor ? ' active' : '');
+      b.style.background = c.hex;
+      b.title = c.name;
+      b.onclick = () => {
+        curColor = c.hex;
+        document.querySelectorAll('.color-btn').forEach(x =>
+          x.classList.toggle('active', x.title === c.name));
+        rebuildPreview();
+        updatePreview();
+      };
+      pal.appendChild(b);
+    }
+  }
+
+  // 锤子光标（SVG data URI）
+  const HAMMER_CURSOR = 'url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'32\' height=\'32\' viewBox=\'0 0 32 32\'><rect x=\'2\' y=\'12\' width=\'14\' height=\'8\' fill=\'%23c0c0c0\' stroke=\'%23666\' stroke-width=\'1\'/><polygon points=\'14,10 26,10 26,22 14,22\' fill=\'%23888\' stroke=\'%23555\' stroke-width=\'1\'/><rect x=\'26\' y=\'14\' width=\'4\' height=\'4\' fill=\'%23666\'/></svg>") 16 16, crosshair';
+
+  function updateCursor() {
+    const isRemove = toolAction === 'remove';
+    if ((mode === 'build' || mode === 'road' || (mode === 'plot' && plotTool === 'green')) && isRemove) {
+      renderer.domElement.style.cursor = HAMMER_CURSOR;
+    } else if (mode === 'build' && !isRemove) {
+      renderer.domElement.style.cursor = 'crosshair';
+    } else if (mode === 'road' && !isRemove) {
+      renderer.domElement.style.cursor = 'crosshair';
+    } else if (mode === 'plot' && plotTool === 'green' && !isRemove) {
+      renderer.domElement.style.cursor = 'crosshair';
+    } else {
+      renderer.domElement.style.cursor = 'default';
+    }
+  }
+
+  function setMode(m) {
+    // 清除旧的 hover 高亮
+    if (hoveredBrick) { setBrickHighlight(hoveredBrick, false); hoveredBrick = null; }
+    if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+    mode = m;
+    document.getElementById('mode-road').classList.toggle('active', m === 'road');
+    document.getElementById('mode-plot').classList.toggle('active', m === 'plot');
+    document.getElementById('mode-build').classList.toggle('active', m === 'build');
+    buildTypeButtons();
+    updateCursor();
+    updatePreview();
+  }
+
+  function setToolAction(a) {
+    // 清除旧的 hover 高亮
+    if (hoveredBrick) { setBrickHighlight(hoveredBrick, false); hoveredBrick = null; }
+    if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+    // 退出 move 模式时取消正在移动的积木
+    if (movingBrick && a !== 'move') {
+      movingBrick.group.visible = true;
+      movingBrick = null;
+    }
+    toolAction = a;
+    buildTypeButtons();
+    updateCursor();
+    updatePreview();
+  }
+
+  // ============================================================
+  // 触屏工具栏：平移/旋转模式切换
+  // ============================================================
+  let touchPanMode = false;  // 触屏单指是否改为平移模式
+  const tbPanBtn = document.getElementById('tb-pan');
+  const tbRotateBtn = document.getElementById('tb-rotate');
+  function refreshTouchBar() {
+    tbPanBtn.classList.toggle('active', touchPanMode);
+    tbRotateBtn.classList.toggle('active', !touchPanMode);
+  }
+  // 旋转：开启 OrbitControls 单指旋转
+  tbRotateBtn.onclick = () => {
+    touchPanMode = false;
+    controls.touches.ONE = THREE.TOUCH.ROTATE;
+    refreshTouchBar();
+    flashStatus('触屏：单指旋转 / 双指缩放');
+  };
+  // 平移：单指拖动平移画面，搭建需要先关掉
+  tbPanBtn.onclick = () => {
+    touchPanMode = true;
+    controls.touches.ONE = THREE.TOUCH.PAN;
+    refreshTouchBar();
+    flashStatus('触屏：单指平移画面，关掉平移才能搭建');
+  };
+  document.getElementById('tb-undo').onclick = () => undo();
+  document.getElementById('tb-delete').onclick = () => {
+    setMode('build');
+    setToolAction('remove');
+  };
+  refreshTouchBar();
+
+  // 模式按钮
+  document.getElementById('mode-road').onclick = () => setMode('road');
+  document.getElementById('mode-plot').onclick = () => setMode('plot');
+  document.getElementById('mode-build').onclick = () => setMode('build');
+
+  // 日照面板绑定
+  const latInput = document.getElementById('sp-lat');
+  const latV = document.getElementById('sp-lat-v');
+  const dateSelect = document.getElementById('sp-date');
+  const northInput = document.getElementById('sp-north');
+  const northV = document.getElementById('sp-north-v');
+  const sunInfo = document.getElementById('sun-info');
+
+  function bindSunUI() {
+    sunConfig.latitude = parseFloat(latInput.value);
+    latV.textContent = sunConfig.latitude.toFixed(1) + '°';
+    sunConfig.dayOfYear = parseInt(dateSelect.value);
+    sunConfig.northAngle = parseInt(northInput.value);
+    northV.textContent = sunConfig.northAngle + '°';
+  }
+  latInput.oninput = bindSunUI;
+  dateSelect.onchange = bindSunUI;
+  northInput.oninput = bindSunUI;
+  bindSunUI();
+
+  // 一键日照分析
+  const btnSun = document.getElementById('btn-sun');
+  btnSun.onclick = () => {
+    bindSunUI();
+    runSunAnalysis();
+  };
+
+  // 清除日照覆盖
+  function clearSunOverlay() {
+    const old = scene.getObjectByName('sun-overlay');
+    if (old) {
+      old.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+      scene.remove(old);
+    }
+    sunInfo.style.display = 'none';
+    sunConfig.analysisDone = false;
+  }
+  document.getElementById('btn-sun-clear').onclick = clearSunOverlay;
+
+  function runSunAnalysis() {
+    // 移除之前的日照覆盖层
+    scene.getObjectByName('sun-overlay')?.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    scene.getObjectByName('sun-overlay') && scene.remove(scene.getObjectByName('sun-overlay'));
+
+    if (bricks.length === 0) { flash('先建点东西再分析'); return; }
+
+    // 对每栋积木，计算其四个立面在给定日期下的日照小时数
+    // 简化版：只考虑"该立面在某个时刻是否被其他积木遮挡"
+    // 方法：遍历 6:00~18:00 每小时，计算太阳方向，然后用射线检测是否被其他积木挡住
+    const sunOverlay = new THREE.Group();
+    sunOverlay.name = 'sun-overlay';
+
+    const bricksByPos = new Map();
+    bricks.forEach((b, i) => { bricksByPos.set(b.i + ',' + b.k + ',' + b.layer, i); });
+
+    // 每个立面的日照小时累计
+    // 积木数据：{i, k, layer, w, d, rot, color}
+    // 四个立面朝向（世界坐标）取决于 rot
+    // 0° 或 180°：+X 面(右), -X 面(左), +Z 面(后), -Z 面(前)
+    // 90° 或 270°：+X 面(后), -X 面(前), +Z 面(左), -Z 面(右)
+    // 简化：用积木中心 + 朝向向量表示每个立面
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.far = 200;
+
+    const results = [];
+    const hourStep = 0.5;  // 半小时一格
+    const startHour = 6, endHour = 18;
+
+    bricks.forEach(brick => {
+      const [bx, bz] = gridToWorld(brick.i, brick.k);
+      const h = brick.layer * BRICK_H;  // 积木底部高度
+      // 积木尺寸：w=X方向，d=Z方向
+      const [cw, cd] = brick.rot % 180 === 0
+        ? [BRICK_TYPES[brick.type].w, BRICK_TYPES[brick.type].d]
+        : [BRICK_TYPES[brick.type].d, BRICK_TYPES[brick.type].w];
+
+      // 四个立面：Three.js +X=东 +Z=北
+      // 每个立面：中心坐标 + 法线 + 平面宽度（沿立面方向的长度）
+      const midY = h + BRICK_H / 2;
+      const faces = [
+        // +X 面（东侧）：中心 X=bx+cw/2，宽度沿 Z 方向 = cd
+        { cx: bx + cw / 2, cy: midY, cz: bz, nx: 1,  ny: 0, nz: 0, width: cd },
+        // -X 面（西侧）
+        { cx: bx - cw / 2, cy: midY, cz: bz, nx: -1, ny: 0, nz: 0, width: cd },
+        // +Z 面（北侧）：中心 Z=bz+cd/2，宽度沿 X 方向 = cw
+        { cx: bx, cy: midY, cz: bz + cd / 2, nx: 0, ny: 0, nz: 1,  width: cw },
+        // -Z 面（南侧）
+        { cx: bx, cy: midY, cz: bz - cd / 2, nx: 0, ny: 0, nz: -1, width: cw },
+      ];
+
+      const faceHours = [0, 0, 0, 0];
+
+      for (let hh = startHour; hh <= endHour; hh += hourStep) {
+        const s = computeSunAtHour(hh);
+        if (s.altDeg <= 0) continue;
+
+        // 太阳方向（世界坐标）
+        const azimRad = deg2rad(s.azimDeg - sunConfig.northAngle);
+        const sunDir = new THREE.Vector3(
+          Math.sin(azimRad), 0, -Math.cos(azimRad)
+        );
+        sunDir.y = Math.sin(s.alt);
+        sunDir.normalize();
+
+        faces.forEach((face, fi) => {
+          const normal = new THREE.Vector3(face.nx, face.ny, face.nz);
+          if (normal.dot(sunDir) >= 0) return;  // 背向太阳
+
+          const origin = new THREE.Vector3(face.cx, face.cy, face.cz);
+          origin.add(normal.clone().multiplyScalar(0.15));
+          raycaster.set(origin, sunDir);
+
+          const meshes = [];
+          bricks.forEach(other => {
+            if (other === brick) return;
+            const g = other.group;
+            if (g) g.traverse(o => { if (o.isMesh && o.geometry instanceof THREE.BoxGeometry) meshes.push(o); });
+          });
+          const hits = raycaster.intersectObjects(meshes, false);
+          if (hits.length === 0 || hits[0].distance > 50) {
+            faceHours[fi] += hourStep;
+          }
+        });
+      }
+
+      // 根据日照小时数给立面染色
+      faces.forEach((face, fi) => {
+        const fh = faceHours[fi];
+        if (fh === 0) return;
+        let color;
+        if (fh < 1) color = 0xbdbdbd;       // 浅灰（有一点日照）
+        else if (fh < 2) color = 0xffe082;   // 浅黄
+        else if (fh < 4) color = 0xffb74d;   // 橙
+        else if (fh < 6) color = 0xff7043;   // 深橙
+        else color = 0xe53935;               // 红
+
+        // PlaneGeometry 默认在 XY 平面，法线 +Z
+        // 对于 +X/-X 法线面：旋转 around Y by ±90°，宽度用 face.width（Z方向长度）
+        // 对于 +Z/-Z 法线面：旋转 around X by ±90°，宽度用 face.width（X方向长度）
+        const planeW = face.width;
+        const planeH = BRICK_H * 0.96;
+        const geo = new THREE.PlaneGeometry(planeW * 0.98, planeH);
+        const mat = new THREE.MeshBasicMaterial({
+          color, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthTest: true,
+        });
+        const overlay = new THREE.Mesh(geo, mat);
+        overlay.position.set(face.cx, face.cy, face.cz);
+
+        if (face.nx !== 0) {
+          // 法线沿 X → 平面绕 Y 轴旋转 90°
+          overlay.rotation.y = face.nx > 0 ? -Math.PI / 2 : Math.PI / 2;
+        } else if (face.nz !== 0) {
+          // 法线沿 Z → 平面绕 X 轴旋转 90°
+          overlay.rotation.x = face.nz > 0 ? Math.PI / 2 : -Math.PI / 2;
+        }
+        sunOverlay.add(overlay);
+      });
+
+      results.push({ brick, hours: faceHours });
+    });
+
+    scene.add(sunOverlay);
+    sunConfig.analysisDone = true;
+
+    // 统计
+    const totalFaces = results.length * 4;
+    const goodFaces = results.filter(r => r.hours.some(h => h >= 4)).length;
+    const northFaces = results.reduce((s, r) => s + r.hours[3], 0);  // 北
+    const southFaces = results.reduce((s, r) => s + r.hours[2], 0); // 南
+    sunInfo.style.display = 'block';
+    sunInfo.innerHTML = `
+      共 <b>${results.length}</b> 栋积木<br>
+      立面达标率 (≥4h): <b>${(goodFaces / Math.max(1, results.length) * 100).toFixed(0)}%</b><br>
+      南向总日照: <b>${southFaces.toFixed(1)}h</b> / 北向: <b>${northFaces.toFixed(1)}h</b><br>
+      <span style="font-size:9px;color:#999">⚪灰=0h 🟡黄=1-2h 🟠橙=2-4h 🔴红=4h+</span>
+    `;
+    flash('日照分析完成 ✓');
+  }
+
+  // 画布大小预设
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyCanvasSize(
+        parseInt(btn.dataset.w),
+        parseInt(btn.dataset.h),
+        parseInt(btn.dataset.m)
+      );
+    };
+  });
+
+  // 自定义大小
+  document.getElementById('cust-apply').onclick = () => {
+    const w = parseInt(document.getElementById('cust-w').value);
+    const h = parseInt(document.getElementById('cust-h').value);
+    const m = parseInt(document.getElementById('cust-m').value);
+    if (!w || !h || !m || w < 10 || h < 10 || m < 1) {
+      flashStatus('参数无效');
+      return;
+    }
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    applyCanvasSize(w, h, m);
+  };
+
+  function applyCanvasSize(w, h, m) {
+    // 切换画布前需清空（坐标会失效）
+    if (bricks.length > 0 || roadCells.size > 0) {
+      if (!confirm('切换画布大小将清空当前作品。继续？')) return;
+    }
+    GRID_W = w; GRID_H = h; METER_PER_CELL = m;
+    clearAll();
+    rebuildGround();
+    detectPlots();   // 全空时识别为 1 个大地块
+    updateStatus();
+    onResize();
+    // 重置视角以适应新画布
+    const d = Math.max(GRID_W, GRID_H);
+    camera.position.set(d * 0.6, d * 0.72, d * 0.6);
+    controls.target.set(0, 4, 0);
+    controls.update();
+    flashStatus(`画布已设为 ${w}×${h}（每格 ${m}m）`);
+  }
+
+  // 视角切换
+  document.getElementById('view-iso').onclick = () => {
+    document.getElementById('view-iso').classList.add('active');
+    document.getElementById('view-top').classList.remove('active');
+    const d = Math.max(GRID_W, GRID_H);
+    animateCameraTo(d * 0.6, d * 0.72, d * 0.6, 0, 4, 0);
+  };
+  document.getElementById('view-top').onclick = () => {
+    document.getElementById('view-top').classList.add('active');
+    document.getElementById('view-iso').classList.remove('active');
+    const d = Math.max(GRID_W, GRID_H);
+    animateCameraTo(0.01, d * 1.2, 0.01, 0, 0, 0);
+  };
+
+  function animateCameraTo(x, y, z, tx, ty, tz) {
+    const startPos = camera.position.clone();
+    const startTarget = controls.target.clone();
+    const endPos = new THREE.Vector3(x, y, z);
+    const endTarget = new THREE.Vector3(tx, ty, tz);
+    const t0 = performance.now();
+    const dur = 600;
+    function step() {
+      const t = Math.min(1, (performance.now() - t0) / dur);
+      const ease = 1 - Math.pow(1 - t, 3);
+      camera.position.lerpVectors(startPos, endPos, ease);
+      controls.target.lerpVectors(startTarget, endTarget, ease);
+      controls.update();
+      if (t < 1) requestAnimationFrame(step);
+    }
+    step();
+  }
+
+  // 旋转 / 重算 / 保存 / 导入 / 清空
+  document.getElementById('btn-rotate').onclick = () => {
+    curRot = (curRot + 1) % 4;
+    rebuildPreview();
+    updatePreview();
+  };
+
+  // 可视化按钮
+  document.querySelectorAll('.viz-btn').forEach(btn => {
+    btn.onclick = () => {
+      vizMode = btn.dataset.viz;
+      document.querySelectorAll('.viz-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      // 图例更新
+      const legend = document.getElementById('viz-legend');
+      legend.className = 'viz-legend';
+      if (vizMode === 'far') {
+        legend.setAttribute('data-lo', '0'); legend.setAttribute('data-hi', '10+');
+        legend.style.background = 'linear-gradient(to right, #ffffff, #c0392b)';
+      } else if (vizMode === 'density') {
+        legend.setAttribute('data-lo', '0'); legend.setAttribute('data-hi', '80%');
+        legend.style.background = 'linear-gradient(to right, #ffffff, #d35400)';
+      } else if (vizMode === 'green') {
+        legend.setAttribute('data-lo', '0'); legend.setAttribute('data-hi', '50%+');
+        legend.style.background = 'linear-gradient(to right, #ffffff, #2e7d32)';
+      } else {
+        legend.removeAttribute('data-lo'); legend.removeAttribute('data-hi');
+        legend.style.background = 'transparent';
+      }
+      rebuildPlotLayer();
+    };
+  });
+
+  document.getElementById('btn-redetect').onclick = () => {
+    detectPlots();
+    flashStatus('已重算 ' + plotCount + ' 个地块');
+  };
+  document.getElementById('btn-save').onclick = () => {
+    const blob = new Blob([JSON.stringify(serialize(), null, 2)],
+      { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'urban_sandbox_' + Date.now() + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  const fileInput = document.getElementById('file-input');
+  document.getElementById('btn-load').onclick = () => fileInput.click();
+  fileInput.onchange = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try { loadFrom(JSON.parse(r.result)); flashStatus('已导入 ' + f.name); }
+      catch (err) { flashStatus('导入失败：JSON 格式错误'); }
+    };
+    r.readAsText(f);
+    fileInput.value = '';
+  };
+  document.getElementById('btn-undo').onclick = undo;
+  document.getElementById('btn-clear-build').onclick = () => {
+    if (!bricks.length) { flashStatus('没有建筑可清除'); return; }
+    if (confirm(`确定清除全部 ${bricks.length} 块建筑？`)) { pushUndo(); clearBuildings(); if (typeof clearSunOverlay === 'function') clearSunOverlay(); }
+  };
+  document.getElementById('btn-clear-road').onclick = () => {
+    if (!roadCells.size) { flashStatus('没有道路可清除'); return; }
+    if (confirm(`确定清除全部 ${roadCells.size} 格道路？`)) { pushUndo(); clearRoads(); }
+  };
+  document.getElementById('btn-clear-green').onclick = () => {
+    if (!greenCells.size) { flashStatus('没有绿地可清除'); return; }
+    if (confirm(`确定清除全部 ${greenCells.size} 格绿地？`)) { pushUndo(); clearGreens(); }
+  };
+  document.getElementById('btn-clear-all').onclick = () => {
+    if (!bricks.length && !roadCells.size && !greenCells.size) { flashStatus('画布已空'); return; }
+    if (confirm('确定清空全部（建筑 + 道路 + 绿地）？')) { pushUndo(); clearAll(); if (typeof clearSunOverlay === 'function') clearSunOverlay(); }
+  };
+
+  // ============================================================
+  // 11. 状态栏 / 临时提示
+  // ============================================================
+  function updateStatus() {
+    document.getElementById('cur-canvas').textContent = GRID_W + '×' + GRID_H;
+    document.getElementById('cur-meter').textContent = METER_PER_CELL + 'm';
+    const totalArea = GRID_W * GRID_H * METER_PER_CELL * METER_PER_CELL;
+    document.getElementById('cur-area').textContent = totalArea.toLocaleString() + '㎡';
+    const roadPct = roadCells.size / (GRID_W * GRID_H) * 100;
+    document.getElementById('cur-road').textContent = roadPct.toFixed(1) + '%';
+    document.getElementById('cur-plots').textContent = plotCount;
+    document.getElementById('cur-bricks').textContent = bricks.length;
+    // 顶部尺度显示
+    document.getElementById('scale-readout').textContent =
+      `画布 ${GRID_W * METER_PER_CELL}m × ${GRID_H * METER_PER_CELL}m`;
+    // 刷新全局指标面板
+    updateMetricsPanel();
+  }
+
+  function fmtArea(v) {
+    if (v >= 10000) return (v / 10000).toFixed(1) + '万㎡';
+    return Math.round(v).toLocaleString() + '㎡';
+  }
+  function fmtPct(v) { return (v * 100).toFixed(1) + '%'; }
+  function fmtNum(v) { return v.toFixed(2); }
+
+  function updateMetricsPanel() {
+    // 全局指标：渲染到底部状态栏第二行（横排）
+    const sbEl = document.getElementById('sb-metrics');
+    if (sbEl) {
+      const m = computeMetrics();
+      sbEl.innerHTML = `
+        <span>GFA <b>${fmtArea(m.gfa)}</b></span>
+        <span>FAR 容积率 <b class="${m.far > 8 ? 'warn' : ''}">${fmtNum(m.far)}</b></span>
+        <span>建筑密度 <b>${fmtPct(m.buildingDensity)}</b></span>
+        <span>绿地率 <b>${fmtPct(m.greenRate)}</b></span>
+        <span>道路率 <b>${fmtPct(m.roadRate)}</b></span>
+        <span>平均层数 <b>${fmtNum(m.avgFloors)} 层</b></span>
+        <span>人口 <b>${m.population.toLocaleString()}</b></span>
+        <span>人口密度 <b>${m.popDensity.toLocaleString()} 人/㎢</b></span>
+      `;
+    }
+    // 高亮地块指标：保持在右侧栏
+    const plotEl = document.getElementById('plot-metrics-body');
+    if (plotEl) {
+      if (highlightedPlot) {
+        const pm = computePlotMetrics(highlightedPlot);
+        if (pm) {
+          plotEl.innerHTML = `
+            <div class="m-row"><span>地块</span><b>#${highlightedPlot}</b></div>
+            <div class="m-row"><span>面积</span><b>${fmtArea(pm.plotArea)}</b></div>
+            <div class="m-row"><span>GFA</span><b>${fmtArea(pm.gfa)}</b></div>
+            <div class="m-row"><span>容积率</span><b>${fmtNum(pm.far)}</b></div>
+            <div class="m-row"><span>建筑密度</span><b>${fmtPct(pm.buildingDensity)}</b></div>
+            <div class="m-row"><span>绿地率</span><b>${fmtPct(pm.greenRate)}</b></div>
+            <div class="m-row"><span>平均层数</span><b>${fmtNum(pm.avgFloors)} 层</b></div>
+          `;
+        } else {
+          plotEl.innerHTML = '<div class="m-row" style="color:#888">该地块无数据</div>';
+        }
+      } else {
+        plotEl.innerHTML = '<div class="m-row" style="color:#888">点击地块查看指标</div>';
+      }
+    }
+  }
+  let flashTimer = null;
+  function flashStatus(msg) {
+    const bar = document.getElementById('statusbar');
+    if (flashTimer) clearTimeout(flashTimer);
+    bar.classList.add('flash');
+    bar.dataset.msg = msg;
+    flashTimer = setTimeout(() => {
+      bar.classList.remove('flash');
+      bar.removeAttribute('data-msg');
+    }, 1800);
+  }
+
+  // ============================================================
+  // 12. 保存 / 读取
+  // ============================================================
+  const STORAGE_KEY = 'urban_sandbox_save_v1';
+
+  function serialize() {
+    return {
+      version: 1,
+      grid: { w: GRID_W, h: GRID_H, m: METER_PER_CELL },
+      roads: Array.from(roadCells),
+      greens: Array.from(greenCells.entries()).map(([key, layer]) => ({ key, layer })),
+      bricks: bricks.map(b => ({
+        type: b.type, color: b.color,
+        i: b.i, k: b.k, layer: b.layer, rotIdx: b.rotIdx,
+      })),
+    };
+  }
+
+  function autoSave() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize()));
+    } catch (e) {}
+  }
+
+  function loadFrom(data) {
+    clearAll();
+    if (data.grid) {
+      GRID_W = data.grid.w || GRID_W;
+      GRID_H = data.grid.h || GRID_H;
+      METER_PER_CELL = data.grid.m || METER_PER_CELL;
+      rebuildGround();
+      onResize();
+    }
+    if (Array.isArray(data.roads)) {
+      for (const key of data.roads) roadCells.add(key);
+      rebuildRoadLayer();
+    }
+    if (Array.isArray(data.greens)) {
+      for (const item of data.greens) {
+        if (typeof item === 'string') {
+          // 旧格式兼容：纯 "i,k" → layer 0
+          greenCells.set(item, 0);
+        } else if (item && typeof item.key === 'string') {
+          greenCells.set(item.key, item.layer || 0);
+        }
+      }
+      rebuildGreenLayer();
+    }
+    detectPlots();
+    if (Array.isArray(data.bricks)) {
+      for (const b of data.bricks) {
+        if (!BRICK_TYPES[b.type]) continue;
+        if (canPlace(b.type, b.rotIdx, b.i, b.k, b.layer)) {
+          placeBrick(b.type, b.color, b.rotIdx, b.i, b.k, b.layer);
+        }
+      }
+    }
+    updateStatus();
+  }
+
+  function loadFromStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      loadFrom(JSON.parse(raw));
+    } catch (e) {}
+  }
+
+  // ============================================================
+  // 13. 自适应
+  // ============================================================
+  function onResize() {
+    viewSize = computeViewSize();
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    const a = w / h;
+    camera.left = -viewSize * a;
+    camera.right = viewSize * a;
+    camera.top = viewSize;
+    camera.bottom = -viewSize;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+  }
+  window.addEventListener('resize', onResize);
+
+  // ============================================================
+  // 14. 初始化 + 渲染
+  // ============================================================
+  rebuildGround();
+  buildTypeButtons();
+  buildPalette();
+  detectPlots();   // 默认 50×50 无道路 → 1 个大地块
+  updateStatus();
+  updateCursor();
+  loadFromStorage();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    const MARGIN = 3;
+    if (controls.target.x < -HALF_W - MARGIN) controls.target.x = -HALF_W - MARGIN;
+    if (controls.target.x >  HALF_W + MARGIN) controls.target.x =  HALF_W + MARGIN;
+    if (controls.target.z < -HALF_H - MARGIN) controls.target.z = -HALF_H - MARGIN;
+    if (controls.target.z >  HALF_H + MARGIN) controls.target.z =  HALF_H + MARGIN;
+    if (previewMesh && previewMesh.visible) {
+      previewMat.opacity = 0.35 + 0.1 * Math.sin(performance.now() * 0.005);
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+  </script>
+</body>
+</html>
