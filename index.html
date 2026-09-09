@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>Urban Sandbox — 3D Sketchpad for Architects & Planners</title>
+  <title>城市设计沙盒 v0.1</title>
   <style>
     /* ===== Apple 浅色风格 Design Tokens ===== */
     :root {
@@ -52,19 +52,22 @@
     #topbar {
       background: var(--surface);
       border-bottom: 0.5px solid var(--separator);
-      padding: 8px 16px;
+      padding: 6px 12px;
       display: flex;
       align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
+      gap: 10px;
+      flex-wrap: nowrap;
+      overflow: visible;
       font-size: 12px;
+      white-space: nowrap;
     }
     #topbar .group {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding-right: 16px;
+      gap: 5px;
+      padding-right: 10px;
       border-right: 0.5px solid var(--separator);
+      flex-shrink: 0;
     }
     #topbar .group:last-child { border-right: none; }
     #topbar label { color: var(--text-tertiary); font-size: 11px; font-weight: 500; }
@@ -104,15 +107,87 @@
       background: var(--blue);
       color: #fff;
     }
+    /* 画布悬浮信息块（与指南针对称：左上角） */
+    .canvas-floating {
+      position: absolute;
+      z-index: 20;
+      pointer-events: none;
+      background: rgba(255,255,255,0.85);
+      border: 0.5px solid var(--separator-opaque);
+      border-radius: var(--radius-sm);
+      padding: 4px 10px;
+      font-size: 11px;
+      color: var(--text-tertiary);
+      font-variant-numeric: tabular-nums;
+    }
+    #canvas-info {
+      top: 14px; left: 16px;
+    }
     #topbar .scale-readout {
       color: var(--text-tertiary);
       font-size: 11px;
     }
+    /* 顶栏北方向调整模块 */
+    .north-group input[type=range] { accent-color: var(--blue); width: 120px; }
+    .north-group .north-val {
+      min-width: 36px; text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: var(--blue); font-weight: 600;
+    }
+    .north-group button { padding: 4px 10px; font-size: 11px; }
+
+    /* ===== 语言下拉菜单 ===== */
+    .lang-dropdown { position: relative; }
+    .lang-dropdown #lang-toggle {
+      padding: 6px 10px;
+      background: var(--surface-alt);
+      border: none;
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .lang-dropdown #lang-toggle:hover { background: var(--separator-opaque); }
+    .lang-menu {
+      position: absolute;
+      top: 110%;
+      right: 0;
+      background: var(--surface);
+      border: 0.5px solid var(--separator-opaque);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      padding: 4px 0;
+      min-width: 120px;
+      display: none;
+      z-index: 100;
+    }
+    .lang-dropdown.open .lang-menu { display: block; }
+    .lang-option {
+      padding: 7px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .lang-option:hover { background: var(--surface-alt); }
+    .lang-option.active { color: var(--blue); font-weight: 600; }
 
     /* ===== 主体 ===== */
     #main { flex: 1; display: flex; overflow: hidden; }
     #canvas-wrap { flex: 1; position: relative; }
     canvas { display: block; }
+
+    /* ===== 指北针（画布右上角，建筑图纸风格） ===== */
+    #compass {
+      position: absolute;
+      top: 14px; right: 16px;
+      width: 68px; height: 80px;
+      z-index: 20;
+      pointer-events: none;
+      transition: none;
+      transform-origin: 50% 45.5px;   /* 对准 SVG 圆心（cy=66/116×80）*/
+    }
+    #compass svg { display: block; width: 100%; height: 100%; }
 
     /* ===== 左侧工具栏 ===== */
     #toolbar {
@@ -131,6 +206,24 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
+    /* 模式切换（左栏顶部，竖排） */
+    #mode-bar { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .mode-btn {
+      width: 100%;
+      padding: 10px 6px;
+      background: var(--surface-alt);
+      border: none;
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      transition: all .15s;
+      font-family: inherit;
+    }
+    .mode-btn:hover { background: var(--separator); }
+    .mode-btn.active { background: var(--blue); color: #fff; box-shadow: 0 1px 4px rgba(0,122,255,0.3); }
     .tool-btn {
       width: 100%;
       padding: 8px 6px;
@@ -547,54 +640,82 @@
   <!-- ===== 顶部工具条 ===== -->
   <div id="topbar">
     <div class="group">
-      <label>画布预设:</label>
+      <label data-i18n="canvas-preset">画布预设:</label>
       <button class="preset-btn" data-w="30" data-h="30" data-m="2">小 (60m×60m)</button>
       <button class="preset-btn active" data-w="50" data-h="50" data-m="4">中 (200m×200m)</button>
       <button class="preset-btn" data-w="80" data-h="80" data-m="8">大 (640m×640m)</button>
     </div>
     <div class="group">
-      <label>自定义:</label>
+      <label data-i18n="custom">自定义:</label>
       <input type="number" id="cust-w" min="10" max="200" value="50">
       <span>×</span>
       <input type="number" id="cust-h" min="10" max="200" value="50">
-      <label>每格(m):</label>
+      <label data-i18n="per-cell">每格(m):</label>
       <input type="number" id="cust-m" min="1" max="50" value="4">
-      <button id="cust-apply">应用</button>
+      <button id="cust-apply" data-i18n="apply">应用</button>
     </div>
     <div class="group">
-      <label>视角:</label>
-      <button id="view-iso" class="active">等距</button>
-      <button id="view-top">俯视</button>
+      <label data-i18n="view">视角:</label>
+      <button id="view-iso" class="active" data-i18n="iso">等距</button>
+      <button id="view-top" data-i18n="top">俯视</button>
     </div>
-    <div class="group">
-      <label>模式:</label>
-      <button id="mode-road">道路</button>
-      <button id="mode-plot" class="active">地块</button>
-      <button id="mode-build">建筑</button>
+    <div class="group north-group">
+      <label data-i18n="north">🧭 北方向</label>
+      <input type="range" id="top-north" min="-45" max="45" step="5" value="0">
+      <span class="north-val" id="top-north-v">0°</span>
+      <button id="top-north-reset" title="恢复正北" data-i18n="reset-north">归零</button>
     </div>
-    <div class="group">
-      <span class="scale-readout" id="scale-readout"></span>
+    <div class="group lang-group">
+      <div class="lang-dropdown">
+        <button id="lang-toggle" title="切换语言">中文 ▾</button>
+        <div class="lang-menu" id="lang-menu">
+          <div class="lang-option active" data-lang="zh">🇨🇳 中文</div>
+          <div class="lang-option" data-lang="en">🇬🇧 English</div>
+        </div>
+      </div>
     </div>
   </div>
 
   <div id="main">
     <!-- 左侧工具栏 -->
     <div id="toolbar">
-      <h3 id="tool-title">工具</h3>
+      <h3 data-i18n="mode">模式</h3>
+      <div id="mode-bar">
+        <button class="mode-btn" id="mode-road" data-i18n="mode-road">🛣️ 道路</button>
+        <button class="mode-btn" id="mode-plot" data-i18n="mode-plot">🟫 地块</button>
+        <button class="mode-btn active" id="mode-build" data-i18n="mode-build">🧱 建筑</button>
+      </div>
+      <h3 id="tool-title" data-i18n="tool">工具</h3>
       <div id="tool-list"></div>
     </div>
 
     <!-- 中间画布 -->
     <div id="canvas-wrap">
+      <!-- 左上角：画布尺寸信息（指南针对侧） -->
+      <div id="canvas-info" class="canvas-floating">
+        <span id="scale-readout"></span>
+      </div>
+      <!-- 指北针：整体随相机方位/northAngle 旋转，N 永远指向世界北方 -->
+      <div id="compass">
+        <svg viewBox="0 0 100 116">
+          <circle cx="50" cy="66" r="36" fill="rgba(255,255,255,0.72)" stroke="#63636b" stroke-width="1.6"/>
+          <!-- 十字轴线（伸出圆外） -->
+          <line x1="8"  y1="66" x2="92" y2="66" stroke="#63636b" stroke-width="1.4"/>
+          <line x1="50" y1="24" x2="50" y2="108" stroke="#63636b" stroke-width="1.4"/>
+          <!-- 北针：圆内上半段粗黑 -->
+          <line x1="50" y1="66" x2="50" y2="30" stroke="#1c1c1e" stroke-width="7.5" stroke-linecap="butt"/>
+          <text x="50" y="18" text-anchor="middle" font-family="system-ui, -apple-system, 'PingFang SC', sans-serif"
+                font-size="17" font-weight="600" fill="#1c1c1e">N</text>
+        </svg>
+      </div>
       <div id="statusbar">
         <div class="sb-row">
-          <span>画布: <b id="cur-canvas">50×50</b></span>
-          <span>每格: <b id="cur-meter">4m</b></span>
-          <span>总面积: <b id="cur-area">40000㎡</b></span>
-          <span>道路占比: <b id="cur-road">0%</b></span>
-          <span>地块数: <b id="cur-plots">0</b></span>
-          <span>建筑数: <b id="cur-bricks">0</b></span>
-          <span style="margin-left:auto">已自动保存</span>
+          <span data-i18n="canvas">画布:</span> <b id="cur-canvas">50×50</b>
+          <span data-i18n="per-cell-row">每格:</span> <b id="cur-meter">4m</b>
+          <span data-i18n="total-area">总面积:</span> <b id="cur-area">40000㎡</b>
+          <span data-i18n="plot-count">地块数:</span> <b id="cur-plots">0</b>
+          <span data-i18n="module-count">模块数量:</span> <b id="cur-bricks">0</b>
+          <span style="margin-left:auto" data-i18n="auto-saved">已自动保存</span>
         </div>
         <div class="sb-row sb-metrics" id="sb-metrics"></div>
       </div>
@@ -609,46 +730,45 @@
 
     <!-- 右侧颜色 + 操作 -->
     <div id="side">
-      <h3>颜色</h3>
+      <h3 data-i18n="color">颜色</h3>
       <div id="palette"></div>
-      <h3>撤销</h3>
-      <button class="action-btn" id="btn-undo">撤销 (Ctrl+Z)</button>
-      <h3>清除</h3>
-      <button class="action-btn danger" id="btn-clear-build">清建筑</button>
-      <button class="action-btn danger" id="btn-clear-road">清道路</button>
-      <button class="action-btn danger" id="btn-clear-green">清绿地</button>
-      <button class="action-btn danger" id="btn-clear-all">全部清空</button>
-      <h3>操作</h3>
-      <button class="action-btn" id="btn-rotate">旋转 (R)</button>
-      <button class="action-btn" id="btn-redetect">重算地块</button>
-      <button class="action-btn" id="btn-save">导出 JSON</button>
-      <button class="action-btn" id="btn-load">导入 JSON</button>
+      <h3 data-i18n="undo">撤销</h3>
+      <button class="action-btn" id="btn-undo" data-i18n="undo-btn">撤销 (Ctrl+Z)</button>
+      <h3 data-i18n="clear">清除</h3>
+      <button class="action-btn danger" id="btn-clear-build" data-i18n="clear-build">清建筑</button>
+      <button class="action-btn danger" id="btn-clear-road" data-i18n="clear-road">清道路</button>
+      <button class="action-btn danger" id="btn-clear-green" data-i18n="clear-green">清绿地</button>
+      <button class="action-btn danger" id="btn-clear-all" data-i18n="clear-all">全部清空</button>
+      <h3 data-i18n="operation">操作</h3>
+      <button class="action-btn" id="btn-rotate" data-i18n="rotate-btn">旋转 (R)</button>
+      <button class="action-btn" id="btn-redetect" data-i18n="redetect">重算地块</button>
+      <button class="action-btn" id="btn-save" data-i18n="export-json">导出 JSON</button>
+      <button class="action-btn" id="btn-load" data-i18n="import-json">导入 JSON</button>
       <input type="file" id="file-input" accept=".json,application/json">
 
-      <h3>📊 可视化</h3>
+      <h3 data-i18n="viz">📊 可视化</h3>
       <div class="viz-bar">
-        <button class="viz-btn active" data-viz="none">关闭</button>
-        <button class="viz-btn" data-viz="far">容积率</button>
-        <button class="viz-btn" data-viz="density">建筑密度</button>
-        <button class="viz-btn" data-viz="green">绿地率</button>
+        <button class="viz-btn active" data-viz="none" data-i18n="off">关闭</button>
+        <button class="viz-btn" data-viz="far" data-i18n="far">容积率</button>
+        <button class="viz-btn" data-viz="density" data-i18n="viz-density">建筑密度</button>
+        <button class="viz-btn" data-viz="green" data-i18n="viz-green">绿地率</button>
       </div>
       <div class="viz-legend" id="viz-legend"></div>
 
-      <h3>📍 地块指标</h3>
-      <div id="plot-metrics-body" class="metrics-body"><div class="m-row" style="color:#888">点击地块查看指标</div></div>
+      <h3 data-i18n="plot-metrics">📍 地块指标</h3>
+      <div id="plot-metrics-body" class="metrics-body"><div class="m-row" style="color:#888" data-i18n="click-plot">点击地块查看指标</div></div>
 
-      <h3>☀️ 日照分析</h3>
+      <h3 data-i18n="sun-analysis">☀️ 日照分析</h3>
       <div class="sun-panel">
-        <div class="sun-row"><label>纬度</label><input type="range" id="sp-lat" min="-60" max="60" step="0.1" value="23.12"><span id="sp-lat-v">23.12°</span></div>
-        <div class="sun-row"><label>日期</label><select id="sp-date">
-          <option value="80">3月21日 春分</option>
-          <option value="172" selected>6月21日 夏至</option>
-          <option value="266">9月23日 秋分</option>
-          <option value="355">12月22日 冬至</option>
+        <div class="sun-row"><label data-i18n="latitude">纬度</label><input type="range" id="sp-lat" min="-60" max="60" step="0.1" value="23.12"><span id="sp-lat-v">23.12°</span></div>
+        <div class="sun-row"><label data-i18n="date">日期</label><select id="sp-date">
+          <option value="80" data-i18n="eq-spring">3月21日 春分</option>
+          <option value="172" selected data-i18n="sol-summer">6月21日 夏至</option>
+          <option value="266" data-i18n="eq-autumn">9月23日 秋分</option>
+          <option value="355" data-i18n="sol-winter">12月22日 冬至</option>
         </select></div>
-        <div class="sun-row"><label>北方向</label><input type="range" id="sp-north" min="-45" max="45" step="5" value="0"><span id="sp-north-v">0°</span></div>
-        <button class="btn-primary" id="btn-sun" style="margin-top:6px;width:100%">⚡ 计算日照分析</button>
-        <button class="action-btn" id="btn-sun-clear" style="width:100%;margin-top:4px">✕ 清除日照覆盖</button>
+        <button class="btn-primary" id="btn-sun" style="margin-top:6px;width:100%" data-i18n="calc-sun">⚡ 计算日照分析</button>
+        <button class="action-btn" id="btn-sun-clear" style="width:100%;margin-top:4px" data-i18n="clear-sun">✕ 清除日照覆盖</button>
         <div class="sun-info" id="sun-info" style="display:none"></div>
       </div>
     </div>
@@ -701,6 +821,257 @@
   const STUD_H = 0.25;
   const STUD_R = 0.32;
 
+  // ============================================================
+  // i18n 中英文切换
+  // ============================================================
+  const I18N = {
+    zh: {
+      // 顶栏
+      'canvas-preset': '画布预设:',
+      'custom': '自定义:',
+      'per-cell': '每格(m):',
+      'apply': '应用',
+      'view': '视角:',
+      'iso': '等距',
+      'top': '俯视',
+      'north': '🧭 北方向',
+      'reset-north': '归零',
+      'lang-label': '中文',
+      // 左栏
+      'mode': '模式',
+      'mode-road': '🛣️ 道路',
+      'mode-plot': '🟫 地块',
+      'mode-build': '🧱 建筑',
+      'tool': '工具',
+      // 状态栏第一行
+      'canvas': '画布:',
+      'per-cell-row': '每格:',
+      'total-area': '总面积:',
+      'plot-count': '地块数:',
+      'module-count': '模块数量:',
+      'auto-saved': '已自动保存',
+      // 状态栏第二行指标
+      'gfa': 'GFA',
+      'fsi': 'FSI 容积率',
+      'gsi': 'GSI 建筑覆盖率',
+      'osr': 'OSR 空地率',
+      'green-rate': '绿地率',
+      'road-rate': '道路占比',
+      'avg-floors': '平均层数',
+      'projected-pop': '预计人口',
+      'pop-density': '人口密度',
+      'per-cell-unit': '人/㎢',
+      'floors-unit': '层',
+      // 右栏操作
+      'color': '颜色',
+      'undo': '撤销',
+      'undo-btn': '撤销 (Ctrl+Z)',
+      'clear': '清除',
+      'clear-build': '清建筑',
+      'clear-road': '清道路',
+      'clear-green': '清绿地',
+      'clear-all': '全部清空',
+      'operation': '操作',
+      'rotate-btn': '旋转 (R)',
+      'redetect': '重算地块',
+      'export-json': '导出 JSON',
+      'import-json': '导入 JSON',
+      // 可视化
+      'viz': '📊 可视化',
+      'off': '关闭',
+      'far': '容积率',
+      'viz-density': '建筑密度',
+      'viz-green': '绿地率',
+      // 地块指标面板
+      'plot-metrics': '📍 地块指标',
+      'click-plot': '点击地块查看指标',
+      'plot-id': '地块',
+      'area': '面积',
+      'no-plot-data': '该地块无数据',
+      // 日照
+      'sun-analysis': '☀️ 日照分析',
+      'calc-sun': '⚡ 计算日照分析',
+      'clear-sun': '✕ 清除日照覆盖',
+      // 触屏
+      'rotate': '↻ 旋转',
+      'pan': '✥ 平移',
+      'undo-tb': '↶ 撤销',
+      'delete-mode': '✕ 拆除',
+      // 工具按钮
+      'place': '放置',
+      'remove': '拆除',
+      'move': '移动',
+      'erase': '擦除',
+      'paint': '涂刷',
+      // 模式工具标题
+      'road-tools': '道路工具',
+      'plot-tools': '地块工具',
+      'build-tools': '积木',
+      'road-width': '道路宽度',
+      'highlight': '高亮',
+      'green': '绿地',
+      'plots': '个地块',
+      // 提示文本
+      'road-hint-place': '左键点击起点 →<br>再点击终点画路<br>靠近水平/竖直自动磁吸<br>右键 / Esc 取消',
+      'road-hint-remove': '点击道路<br>删除整段',
+      'plot-hint-highlight': '左键高亮地块<br>右键取消高亮',
+      'green-hint-place': '左键画绿地<br>按住拖动连续画',
+      'green-hint-remove': '点击删除绿地<br>按住拖动连续擦除',
+      // 状态/提示
+      'saved': '已保存',
+      'road-on-green': '绿地不能压道路',
+      'road-on-build': '道路不能穿过建筑',
+      'no-undo': '没有可撤销的操作',
+      'done': '完成',
+      // 日照分析
+      'latitude': '纬度',
+      'date': '日期',
+      'eq-spring': '3月21日 春分',
+      'sol-summer': '6月21日 夏至',
+      'eq-autumn': '9月23日 秋分',
+      'sol-winter': '12月22日 冬至',
+      // 画布左上角
+      'scale-prefix': '画布',
+    },
+    en: {
+      'canvas-preset': 'Canvas preset:',
+      'custom': 'Custom:',
+      'per-cell': 'Cell (m):',
+      'apply': 'Apply',
+      'view': 'View:',
+      'iso': 'Isometric',
+      'top': 'Top',
+      'north': '🧭 North angle',
+      'reset-north': 'Reset',
+      'lang-label': 'EN',
+      'mode': 'Mode',
+      'mode-road': '🛣️ Road',
+      'mode-plot': '🟫 Plot',
+      'mode-build': '🧱 Build',
+      'tool': 'Tools',
+      'canvas': 'Canvas:',
+      'per-cell-row': 'Cell:',
+      'total-area': 'Total area:',
+      'plot-count': 'Plots:',
+      'module-count': 'Modules:',
+      'auto-saved': 'Auto-saved',
+      'gfa': 'GFA',
+      'fsi': 'FSI FAR',
+      'gsi': 'GSI Coverage',
+      'osr': 'OSR Open space',
+      'green-rate': 'Green ratio',
+      'road-rate': 'Road ratio',
+      'avg-floors': 'Avg floors',
+      'projected-pop': 'Est. population',
+      'pop-density': 'Pop density',
+      'per-cell-unit': '/km²',
+      'floors-unit': 'floors',
+      'color': 'Color',
+      'undo': 'Undo',
+      'undo-btn': 'Undo (Ctrl+Z)',
+      'clear': 'Clear',
+      'clear-build': 'Clear buildings',
+      'clear-road': 'Clear roads',
+      'clear-green': 'Clear green',
+      'clear-all': 'Clear all',
+      'operation': 'Operations',
+      'rotate-btn': 'Rotate (R)',
+      'redetect': 'Redetect plots',
+      'export-json': 'Export JSON',
+      'import-json': 'Import JSON',
+      'viz': '📊 Visualization',
+      'off': 'Off',
+      'far': 'FAR',
+      'viz-density': 'Building density',
+      'viz-green': 'Green ratio',
+      'plot-metrics': '📍 Plot metrics',
+      'click-plot': 'Click a plot to view',
+      'plot-id': 'Plot',
+      'area': 'Area',
+      'no-plot-data': 'No data for this plot',
+      'sun-analysis': '☀️ Sun analysis',
+      'calc-sun': '⚡ Run sun analysis',
+      'clear-sun': '✕ Clear overlay',
+      'rotate': '↻ Rotate',
+      'pan': '✥ Pan',
+      'undo-tb': '↶ Undo',
+      'delete-mode': '✕ Delete',
+      'place': 'Place',
+      'remove': 'Remove',
+      'move': 'Move',
+      'erase': 'Erase',
+      'paint': 'Paint',
+      // Mode tool titles
+      'road-tools': 'Road tools',
+      'plot-tools': 'Plot tools',
+      'build-tools': 'Bricks',
+      'road-width': 'Road width',
+      'highlight': 'Highlight',
+      'green': 'Green',
+      'plots': 'plots',
+      // Hints
+      'road-hint-place': 'Click start →<br>Click end to draw<br>Snap to H/V automatically<br>Right-click / Esc to cancel',
+      'road-hint-remove': 'Click road<br>Delete entire segment',
+      'plot-hint-highlight': 'Left-click to highlight<br>Right-click to clear',
+      'green-hint-place': 'Click to paint green<br>Drag to paint continuously',
+      'green-hint-remove': 'Click to delete green<br>Drag to erase continuously',
+      'saved': 'Saved',
+      'road-on-green': 'Cannot paint road on green',
+      'road-on-build': 'Cannot paint road through buildings',
+      'no-undo': 'Nothing to undo',
+      'done': 'Done',
+      // Sun analysis
+      'latitude': 'Latitude',
+      'date': 'Date',
+      'eq-spring': 'Mar 21 Equinox',
+      'sol-summer': 'Jun 21 Solstice',
+      'eq-autumn': 'Sep 23 Equinox',
+      'sol-winter': 'Dec 22 Solstice',
+      // Canvas overlay
+      'scale-prefix': 'Canvas',
+    },
+  };
+
+  let currentLang = localStorage.getItem('urbanSandbox.lang') || 'zh';
+
+  // 切换语言下拉：点击外部关闭
+  document.addEventListener('click', (e) => {
+    const dd = document.querySelector('.lang-dropdown');
+    if (!dd) return;
+    if (!dd.contains(e.target)) dd.classList.remove('open');
+  });
+
+  // 把所有带 data-i18n 的元素文本替换为当前语言
+  function applyLang() {
+    const dict = I18N[currentLang];
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (dict[key] !== undefined) el.textContent = dict[key];
+    });
+    // 更新下拉按钮标签
+    const btn = document.getElementById('lang-toggle');
+    if (btn) {
+      const label = currentLang === 'zh' ? '🇨🇳 中文' : '🇬🇧 English';
+      btn.textContent = label + ' ▾';
+    }
+    // 更新 active 状态
+    document.querySelectorAll('.lang-option').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.lang === currentLang);
+    });
+    // 刷新动态面板（指标、地块详情、工具列表）
+    updateMetricsPanel();
+    if (typeof buildTypeButtons === 'function') buildTypeButtons();
+  }
+
+  // 切换到指定语言
+  function setLang(lang) {
+    if (!I18N[lang]) return;
+    currentLang = lang;
+    localStorage.setItem('urbanSandbox.lang', currentLang);
+    applyLang();
+    document.querySelector('.lang-dropdown')?.classList.remove('open');
+  }
+
   // 积木类型
   const BRICK_TYPES = {
     '1x1':  { w: 1, d: 1 },
@@ -711,18 +1082,24 @@
     '3x3':  { w: 3, d: 3 },
     '2x6':  { w: 2, d: 6 },
     '4x4':  { w: 4, d: 4 },
+    's2x2':  { w: 2, d: 2, label: '2×2 斜坡', slope: true },
+    's2x1':  { w: 1, d: 2, label: '2×1 斜坡', slope: true },
+    's3x2':  { w: 2, d: 3, label: '3×2 斜坡', slope: true },
+    's3x1':  { w: 1, d: 3, label: '3×1 斜坡', slope: true },
+    'is2x2': { w: 2, d: 2, label: '2×2 反斜坡', invSlope: true },
+    'is2x1': { w: 1, d: 2, label: '2×1 反斜坡', invSlope: true },
+    'is3x2': { w: 2, d: 3, label: '3×2 反斜坡', invSlope: true },
+    'is3x1': { w: 1, d: 3, label: '3×1 反斜坡', invSlope: true },
   };
 
   // 规划专用色板（建筑师版乐高偏向单色 / 暖灰）
   const COLORS = [
     { name: '白',  hex: '#ffffff' },
     { name: '浅灰', hex: '#c8c8c8' },
-    { name: '深灰', hex: '#3a3a3a' },
     { name: '红',  hex: '#e53935' },
     { name: '蓝',  hex: '#1e88e5' },
     { name: '黄',  hex: '#fdd835' },
     { name: '橙',  hex: '#fb8c00' },
-    { name: '黑',  hex: '#1a1a1a' },
     { name: '粉',  hex: '#ec407a' },
     { name: '紫',  hex: '#8e24aa' },
   ];
@@ -740,7 +1117,7 @@
   let HALF_W = GRID_W / 2, HALF_H = GRID_H / 2;
 
   // 当前模式: 'road' | 'plot' | 'build'
-  let mode = 'plot';
+  let mode = 'build';
 
   // 道路格子: Set<"i,k">
   const roadCells = new Set();
@@ -772,7 +1149,7 @@
   // 撤销系统：快照栈
   // ============================================================
   const MAX_UNDO = 50;
-  const undoStack = [];   // [{ bricks: [...], roads: [...], brickIdSeq: N }]
+  const undoStack = [];   // [{ bricks: [...], roadSegs: [...], roadOrphanCells: [...], brickIdSeq: N }]
   let suppressUndo = false;  // 快照恢复期间不记录新快照
   let dragBatchActive = false;  // 道路拖动涂画期间只记录一次快照（开始时）
 
@@ -783,6 +1160,8 @@
         type: b.type, color: b.color,
         i: b.i, k: b.k, layer: b.layer, rotIdx: b.rotIdx,
       })),
+      roadSegs: roadSegs.map(s => ({ ...s })),
+      roadOrphanCells: roadOrphanCells.slice(),
       roads: Array.from(roadCells),
       brickIdSeq: brickIdSeq,
     });
@@ -803,11 +1182,16 @@
     bricks.length = 0;
     occupancy.clear();
     roadCells.clear();
+    roadSegs.length = 0;
     highlightedPlot = null;
 
-    // 恢复道路
-    for (const key of snap.roads) roadCells.add(key);
-    rebuildRoadLayer();
+    // 恢复道路数据（优先线段；旧快照只有 roads 格子时退化为 orphan 格子）
+    if (Array.isArray(snap.roadSegs) && snap.roadSegs.length) {
+      snap.roadSegs.forEach(s => roadSegs.push({ ...s }));
+      roadOrphanCells = (snap.roadOrphanCells || []).slice();
+    } else {
+      roadOrphanCells = snap.roads.slice();
+    }
 
     // 恢复积木
     brickIdSeq = snap.brickIdSeq;
@@ -833,6 +1217,10 @@
       }
     }
 
+    // 积木就位后再推导道路格子（地面层建筑占位的格不算路）
+    rederiveRoadCells();
+    rebuildRoadLayer();
+
     detectPlots();
     updateStatus();
     autoSave();
@@ -851,16 +1239,24 @@
     dragBatchActive = false;
   }
 
-  // 道路笔刷：{ w, d }，中心点为锚点，向四周扩展
-  let brushSize = { w: 1, d: 1 };
-  const BRUSH_PRESETS = [
-    { label: '1格', w: 1, d: 1 },
-    { label: '2格方', w: 2, d: 2 },
-    { label: '3格方', w: 3, d: 3 },
-    { label: '1×3条', w: 1, d: 3 },
-    { label: '2×4条', w: 2, d: 4 },
-    { label: '3×3斜', w: 3, d: 3, rotate: true },  // 点一下旋转方向
+  // 道路线宽预设（点击起点→终点绘制平滑直线路段）
+  let roadWidth = 2;   // 当前路宽（格）
+  const ROAD_WIDTHS = [
+    { label: '1格', w: 1 },
+    { label: '2格', w: 2 },
+    { label: '3格', w: 3 },
   ];
+  // 道路线段（视觉与交互的真实来源）：{ id, ai, ak, bi, bk, w }，端点为格子索引（格心）
+  const roadSegs = [];
+  let roadSegIdSeq = 1;
+  // 旧版存档里的道路格子（无法还原线段）：独立保存，按格子渲染并参与地块/指标
+  let roadOrphanCells = [];
+  // 画线交互状态
+  let roadStart = null;       // 起点 {i, k}
+  const ROAD_MAGNET_DEG = 4;  // 正交磁吸角度阈值
+  // 道路沿路向两端的端帽长度（格）：0.5 让正交路端线正好落在整数网格线上
+  // 道路沿向恰好覆盖「起点格→终点格」，宽度由 w 决定并在偶数时垂直偏移对齐
+  const ROAD_CAP = 0.5;
 
   // ============================================================
   // 3. 场景 / 相机 / 渲染器
@@ -879,12 +1275,13 @@
     viewSize, -viewSize,
     0.1, 600
   );
-  camera.position.set(30, 36, 30);
+  camera.position.set(30, 36, -30);
   camera.lookAt(0, 4, 0);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;   // 伽马编码输出：修正中间调发灰，亮面/彩色才真正鲜亮
   wrap.appendChild(renderer.domElement);
 
   function refreshOutlineSelection() {
@@ -892,11 +1289,16 @@
   }
 
   // 基础光照（不做实时阴影，日照通过一键分析计算）
-  scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 0.6);
+  // 注意：已开启 sRGBEncoding 输出，中间调会被伽马提亮，灯光数值不宜再堆叠过高以免爆白
+  scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+  // 半球光：朝上的面接收天空色，朝下接收地面反弹色，让背阴面不发死灰
+  const hemi = new THREE.HemisphereLight(0xffffff, 0xdfe3ea, 0.32);
+  hemi.position.set(0, 20, 0);
+  scene.add(hemi);
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.62);
   keyLight.position.set(20, 30, 12);
   scene.add(keyLight);
-  const fill = new THREE.DirectionalLight(0xffffff, 0.25);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.35);
   fill.position.set(-10, 12, -8);
   scene.add(fill);
 
@@ -957,7 +1359,7 @@
 
   // 复用几何/材质
   const roadGeo = new THREE.BoxGeometry(1, 0.06, 1);
-  const roadMat = new THREE.MeshStandardMaterial({ color: 0x4a4a52, roughness: 0.95 });
+  const roadMat = new THREE.MeshLambertMaterial({ color: 0x86868e, side: THREE.DoubleSide });
   const plotGeo = new THREE.PlaneGeometry(1, 1);
   plotGeo.rotateX(-Math.PI / 2);
   const plotMats = PLOT_COLORS.map(c =>
@@ -967,8 +1369,75 @@
     color: 0xffd700, transparent: true, opacity: 0.5, side: THREE.DoubleSide
   });
 
-  // 道路标线材质（黄色虚线感，简化为细线）
-  const roadLineMat = new THREE.LineBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.4 });
+  // ============================================================
+  // 道路线段几何工具：世界坐标 (x,z) 平面，条带
+  // ============================================================
+  // 对偶数宽度道路，中心线偏移 0.5 格（垂直路向），让条带边界精确对齐方格线
+  // 奇数宽度中心线已在格心，条带边界自动对齐，无需偏移
+  // 返回格心坐标 {ax, az, bx, bz}（网格坐标系）
+  function offsetCenterlineGrid(ai, ak, bi, bk, w) {
+    let ax = ai + 0.5, az = ak + 0.5;
+    let bx = bi + 0.5, bz = bk + 0.5;
+    if (w % 2 === 0) {
+      const dx = bx - ax, dz = bz - az;
+      const L = Math.hypot(dx, dz);
+      if (L > 1e-6) {
+        const ux = dx / L, uz = dz / L;
+        let px = -uz, pz = ux;
+        // 一致的方向选择：优先让垂直分量为正
+        if (px < 0 || (Math.abs(px) < 1e-6 && pz < 0)) { px = -px; pz = -pz; }
+        ax += px * 0.5; az += pz * 0.5;
+        bx += px * 0.5; bz += pz * 0.5;
+      }
+    }
+    return { ax, az, bx, bz };
+  }
+
+  function segWorldPoints(seg) {
+    const g = offsetCenterlineGrid(seg.ai, seg.ak, seg.bi, seg.bk, seg.w);
+    // gridToWorld(i,k) = [i+0.5-HALF_W, k+0.5-HALF_H]，已偏移的格心减 HALF 即世界坐标
+    return {
+      ax: g.ax - HALF_W, az: g.az - HALF_H,
+      bx: g.bx - HALF_W, bz: g.bz - HALF_H,
+    };
+  }
+
+  // 清空 group 并释放几何
+  function clearGroupGeos(grp) {
+    while (grp.children.length) {
+      const c = grp.children[0];
+      grp.remove(c);
+      if (c.geometry) c.geometry.dispose();
+    }
+  }
+
+  // 把一条带（矩形条）压入顶点数组（两个三角形，法线朝上）
+  // halfW：垂直路向半宽（= w/2，决定路宽）
+  // cap： 沿路向两端的端帽长度；取 0.5 可让正交路端线落在整数网格线上
+  function buildStrip(pos, ax, az, bx, bz, halfW, cap, y) {
+    let ux = bx - ax, uz = bz - az;
+    const L = Math.hypot(ux, uz);
+    let px, pz;
+    if (L < 1e-6) {
+      // 零长度：退化为 w×w 方形（中心不变，边长 halfW*2）
+      px = 1; pz = 0;
+      const h = halfW;
+      const A = [ax - h, y, az - h], C = [ax + h, y, az + h], B = [ax + h, y, az - h], D = [ax - h, y, az + h];
+      pos.push(...A, ...C, ...B, ...A, ...D, ...C);
+      return;
+    }
+    ux /= L; uz /= L;
+    px = -uz; pz = ux;   // 垂直于路向
+    // 端帽：端点沿中线各延伸 cap（与垂直半宽解耦）
+    const ax2 = ax - ux * cap, az2 = az - uz * cap;
+    const bx2 = bx + ux * cap, bz2 = bz + uz * cap;
+    const A = [ax2 + px * halfW, y, az2 + pz * halfW];
+    const B = [ax2 - px * halfW, y, az2 - pz * halfW];
+    const C = [bx2 - px * halfW, y, bz2 - pz * halfW];
+    const D = [bx2 + px * halfW, y, bz2 + pz * halfW];
+    // 绕序保证法线 +Y
+    pos.push(...A, ...C, ...B, ...A, ...D, ...C);
+  }
 
   function rebuildGround() {
     // 清旧
@@ -989,16 +1458,17 @@
     ground.name = 'ground';
     scene.add(ground);
 
+    // GridHelper 线色经 sRGB 伽马输出会被提亮，这里用线性深色补偿，让最终显示为浅灰/中灰
     gridHelper = new THREE.GridHelper(
       Math.max(GRID_W, GRID_H),
       Math.max(GRID_W, GRID_H),
-      0x666666, 0xcccccc
+      0x1e1e1e, 0x949494
     );
     gridHelper.position.set(0, 0.01, 0);
     scene.add(gridHelper);
 
     const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(GRID_W, 0.05, GRID_H));
-    edgeLine = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: 0x555555 }));
+    edgeLine = new THREE.LineSegments(edgeGeo, new THREE.LineBasicMaterial({ color: 0x262626 }));
     edgeLine.position.set(0, 0, 0);
     scene.add(edgeLine);
   }
@@ -1015,12 +1485,25 @@
   // 5. 道路渲染
   // ============================================================
   function rebuildRoadLayer() {
-    while (roadLayerGroup.children.length) roadLayerGroup.remove(roadLayerGroup.children[0]);
-    for (const key of roadCells) {
+    clearGroupGeos(roadLayerGroup);
+    // 所有线段合并为一张网格：交叉处同材质同几何，无闪烁
+    const surfPos = [];
+    for (const seg of roadSegs) {
+      const { ax, az, bx, bz } = segWorldPoints(seg);
+      buildStrip(surfPos, ax, az, bx, bz, seg.w / 2, ROAD_CAP, 0.035);
+    }
+    if (surfPos.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(surfPos, 3));
+      g.computeVertexNormals();
+      roadLayerGroup.add(new THREE.Mesh(g, roadMat));
+    }
+    // 旧版存档的道路格子（无法还原线段）：逐格渲染
+    for (const key of roadOrphanCells) {
       const [i, k] = key.split(',').map(Number);
       const [x, z] = gridToWorld(i, k);
       const m = new THREE.Mesh(roadGeo, roadMat);
-      m.position.set(x, 0.03, z);
+      m.position.set(x, 0.035, z);
       roadLayerGroup.add(m);
     }
   }
@@ -1083,44 +1566,135 @@
     else if (!wantGreen && isGreen) greenCells.delete(key);
   }
 
-  // 生成笔刷覆盖的格子列表（相对锚点 i,k 的偏移）
-  function getBrushCells() {
-    const cells = [];
-    const hw = Math.floor(brushSize.w / 2);
-    const hd = Math.floor(brushSize.d / 2);
-    // 锚点为中心，处理奇数/偶数尺寸
-    const iStart = -(brushSize.w - 1 - hw);
-    const iEnd = hw;
-    const kStart = -(brushSize.d - 1 - hd);
-    const kEnd = hd;
-    for (let di = iStart; di <= iEnd; di++) {
-      for (let dk = kStart; dk <= kEnd; dk++) {
-        cells.push([di, dk]);
-      }
-    }
-    return cells;
+  // ============================================================
+  // 道路线段逻辑：栅格化推导 roadCells、正交磁吸、点选删除
+  // ============================================================
+  // 格子（格心）到线段的距离（格点坐标系）
+  function distPtSeg(px, pz, ax, az, bx, bz) {
+    const dx = bx - ax, dz = bz - az;
+    const L2 = dx * dx + dz * dz;
+    let t = L2 ? ((px - ax) * dx + (pz - az) * dz) / L2 : 0;
+    t = t < 0 ? 0 : (t > 1 ? 1 : t);
+    return Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
   }
 
-  function toggleRoad(i, k, forceState) {
-    const brushCells = getBrushCells();
-    let changed = 0;
-    let blocked = 0;
-    for (const [di, dk] of brushCells) {
-      const ci = i + di, ck = k + dk;
-      if (!inBounds(ci, ck)) continue;
-      const key = ci + ',' + ck;
-      // 不能在已放建筑下加道路
-      const hasBrick = bricks.some(b => {
-        const fp = getFootprint(b.type, b.rotIdx);
-        return fp.cells.some(([c, d]) => b.i + c === ci && b.k + d === ck);
-      });
-      if (hasBrick) { blocked++; continue; }
-      const isRoad = roadCells.has(key);
-      const wantRoad = forceState !== undefined ? forceState : !isRoad;
-      if (wantRoad && !isRoad) { roadCells.add(key); changed++; }
-      else if (!wantRoad && isRoad) { roadCells.delete(key); changed++; }
+  // 某格是否被地面层（layer 0）积木占据（悬挑体块不挡路）
+  function cellHasGroundBrick(i, k) {
+    for (const b of bricks) {
+      if (b.layer !== 0) continue;
+      const fp = getFootprint(b.type, b.rotIdx);
+      if (fp.cells.some(([c, d]) => b.i + c === i && b.k + d === k)) return true;
     }
-    if (changed === 0 && blocked > 0) flashStatus(`笔刷覆盖 ${blocked} 格被建筑阻挡`);
+    return false;
+  }
+
+  // 道路条带（矩形，几何与 buildStrip 完全一致）是否与格子 (i,k) 的 1×1 方块相交
+  // 用 SAT 分离轴定理：精确判定条带矩形与格子方块的面积重叠，避免对角线路段漏标
+  // hw=垂直半宽，cap=沿路向端帽长度
+  function segStripHitsCell(ax, az, bx, bz, hw, cap, i, k) {
+    const dx = bx - ax, dz = bz - az;
+    const L = Math.hypot(dx, dz);
+    if (L < 1e-6) {
+      // 零长度：退化为以 (ax,az) 为中心、半边 hw 的方块
+      return (ax + hw > i && ax - hw < i + 1 && az + hw > k && az - hw < k + 1);
+    }
+    const ux = dx / L, uz = dz / L;
+    const px = -uz, pz = ux;  // 垂直于路向
+    // 条带端点（端帽：沿路向各延伸 cap）
+    const sax = ax - ux * cap, saz = az - uz * cap;
+    const sbx = bx + ux * cap, sbz = bz + uz * cap;
+    // 条带四角
+    const s1x = sax + px * hw, s1z = saz + pz * hw;
+    const s2x = sax - px * hw, s2z = saz - pz * hw;
+    const s3x = sbx - px * hw, s3z = sbz - pz * hw;
+    const s4x = sbx + px * hw, s4z = sbz + pz * hw;
+    const strip = [[s1x, s1z], [s2x, s2z], [s3x, s3z], [s4x, s4z]];
+    // 格子四角
+    const cell = [[i, k], [i + 1, k], [i + 1, k + 1], [i, k + 1]];
+    // SAT 4 轴：(1,0),(0,1) 来自格子，(ux,uz),(px,pz) 来自条带
+    const axes = [[1, 0], [0, 1], [ux, uz], [px, pz]];
+    for (let a = 0; a < axes.length; a++) {
+      const axX = axes[a][0], axZ = axes[a][1];
+      let sMin = Infinity, sMax = -Infinity, cMin = Infinity, cMax = -Infinity;
+      for (let j = 0; j < 4; j++) {
+        const ds = strip[j][0] * axX + strip[j][1] * axZ;
+        if (ds < sMin) sMin = ds; if (ds > sMax) sMax = ds;
+        const dc = cell[j][0] * axX + cell[j][1] * axZ;
+        if (dc < cMin) cMin = dc; if (dc > cMax) cMax = dc;
+      }
+      // 用 <= 判定分离：仅边/点相切不算占用（避免误标擦边格子）
+      if (sMax <= cMin || cMax <= sMin) return false;
+    }
+    return true;
+  }
+
+  // 把一条线段栅格化到 set 里：条带矩形与格子方块 SAT 相交即算道路
+  function addSegCells(set, seg) {
+    const hw = seg.w / 2;
+    const g = offsetCenterlineGrid(seg.ai, seg.ak, seg.bi, seg.bk, seg.w);
+    const minI = Math.max(0, Math.floor(Math.min(g.ax, g.bx) - hw - 1));
+    const maxI = Math.min(GRID_W - 1, Math.ceil(Math.max(g.ax, g.bx) + hw + 1));
+    const minK = Math.max(0, Math.floor(Math.min(g.az, g.bz) - hw - 1));
+    const maxK = Math.min(GRID_H - 1, Math.ceil(Math.max(g.az, g.bz) + hw + 1));
+    for (let i = minI; i <= maxI; i++) {
+      for (let k = minK; k <= maxK; k++) {
+        if (cellHasGroundBrick(i, k)) continue;
+        if (segStripHitsCell(g.ax, g.az, g.bx, g.bz, hw, ROAD_CAP, i, k)) set.add(i + ',' + k);
+      }
+    }
+  }
+
+  // 由全部线段（+旧格子）重推 roadCells
+  function rederiveRoadCells() {
+    roadCells.clear();
+    for (const seg of roadSegs) addSegCells(roadCells, seg);
+    for (const key of roadOrphanCells) {
+      const [i, k] = key.split(',').map(Number);
+      if (inBounds(i, k) && !cellHasGroundBrick(i, k)) roadCells.add(key);
+    }
+  }
+
+  function commitRoadsChange() {
+    rederiveRoadCells();
+    rebuildRoadLayer();
+    detectPlots();
+    updateStatus();
+    autoSave();
+  }
+
+  // 点选命中：返回距点击格最近的道路段（边缘外 0.45 格容差）
+  function findRoadSegAt(i, k) {
+    const px = i + 0.5, pz = k + 0.5;
+    let best = null, bestD = 0.45;
+    for (const seg of roadSegs) {
+      const g = offsetCenterlineGrid(seg.ai, seg.ak, seg.bi, seg.bk, seg.w);
+      const d = distPtSeg(px, pz, g.ax, g.az, g.bx, g.bz) - seg.w / 2;
+      if (d < bestD) { bestD = d; best = seg; }
+    }
+    return best;
+  }
+
+  // 正交磁吸：终点角度接近 0/90/180/270° 时吸附到正交方向
+  function applyMagnet(ai, ak, bi, bk) {
+    const di = bi - ai, dk = bk - ak;
+    const len = Math.hypot(di, dk);
+    if (len < 1) return { bi, bk };
+    const ang = Math.atan2(dk, di) * 180 / Math.PI;
+    for (const a of [0, 90, -90, 180]) {
+      const diff = Math.abs(((ang - a + 540) % 360) - 180);
+      if (diff <= ROAD_MAGNET_DEG) {
+        const r = a * Math.PI / 180;
+        return { bi: ai + Math.round(len * Math.cos(r)), bk: ak + Math.round(len * Math.sin(r)) };
+      }
+    }
+    return { bi, bk };
+  }
+
+  function cancelRoadStart() {
+    roadStart = null;
+    if (cellHighlightLines) setCellHighlight(0, 0, false);
+    hoveredCellKey = null;
+    updateRoadPreview();
   }
 
   // ============================================================
@@ -1185,15 +1759,19 @@
     const roadArea = roadCellCount * cellArea;
     const greenArea = (greenGroundCells + greenRoofCells) * cellArea;
 
+    const gsi = plotArea > 0 ? footprintArea / plotArea : 0;
+    const fsi = plotArea > 0 ? gfa / plotArea : 0;
+    const osr = fsi > 0 ? (1 - gsi) / fsi : 0;
     return {
       gfa, plotArea, canvasArea, roadArea, greenArea, footprintArea,
-      far: plotArea > 0 ? gfa / plotArea : 0,
-      buildingDensity: plotArea > 0 ? footprintArea / plotArea : 0,
+      far: fsi,
+      buildingDensity: gsi,
       greenRate: plotArea > 0 ? greenArea / plotArea : 0,
       roadRate: canvasArea > 0 ? roadArea / canvasArea : 0,
       avgFloors: footprintArea > 0 ? gfa / footprintArea : 0,
       population: Math.round(gfa / RESIDENTIAL_GFA_PER_PERSON),
       popDensity: plotArea > 0 ? Math.round((gfa / RESIDENTIAL_GFA_PER_PERSON) / (plotArea / 10000)) : 0,
+      osr,
       plotCells, roadCells: roadCellCount,
       greenGroundCells, greenRoofCells,
     };
@@ -1222,12 +1800,16 @@
     }
     const greenArea = greenInPlot * cellArea;
 
+    const gsi = plotArea > 0 ? footprintArea / plotArea : 0;
+    const fsi = plotArea > 0 ? gfa / plotArea : 0;
+    const osr = fsi > 0 ? (1 - gsi) / fsi : 0;
     return {
       plotArea, gfa, footprintArea, greenArea,
-      far: plotArea > 0 ? gfa / plotArea : 0,
-      buildingDensity: plotArea > 0 ? footprintArea / plotArea : 0,
+      far: fsi,
+      buildingDensity: gsi,
       greenRate: plotArea > 0 ? greenArea / plotArea : 0,
       avgFloors: footprintArea > 0 ? gfa / footprintArea : 0,
+      osr,
       cells: cellSet.size,
     };
   }
@@ -1332,10 +1914,161 @@
     return _colorMats[hex];
   }
 
+  // 斜坡楔形几何体：z 负方向为高端（满高 h，带凸点平台），z 正方向为低端（高 lip）
+  // 剖面点：A(zB,0) B(zB,h) C(zC,h) 平台前沿 D(zF,lip) 斜面低端 E(zF,0)
+  // 每个面给一个朝外的 hint 方向，tri() 自动决定绕序，保证法线一律朝外（否则背面受光为黑）
+  function createSlopeGeometry(w, d, h, lip) {
+    const xL = -w / 2, xR = w / 2;
+    const zB = -d / 2, zF = d / 2;
+    const zC = -d / 2 + 0.85;   // 平台深度 0.85 格，保证凸点完全坐落在平台上
+    const V = [];
+    function tri(a, b, c, hint) {
+      const abx = b[0]-a[0], aby = b[1]-a[1], abz = b[2]-a[2];
+      const acx = c[0]-a[0], acy = c[1]-a[1], acz = c[2]-a[2];
+      const nx = aby*acz - abz*acy, ny = abz*acx - abx*acz, nz = abx*acy - aby*acx;
+      // 法线与 hint 同向才是正面，否则交换 b/c 反转绕序
+      if (nx*hint[0] + ny*hint[1] + nz*hint[2] < 0) V.push(...a, ...c, ...b);
+      else V.push(...a, ...b, ...c);
+    }
+    function quad(a, b, c, dd, hint) { tri(a, b, c, hint); tri(a, c, dd, hint); }
+    // 底面（朝下）
+    quad([xL,0,zB],[xR,0,zB],[xR,0,zF],[xL,0,zF], [0,-1,0]);
+    // 高端背墙（朝 -z）
+    quad([xL,0,zB],[xR,0,zB],[xR,h,zB],[xL,h,zB], [0,0,-1]);
+    // 顶部平台（朝上）
+    quad([xL,h,zB],[xR,h,zB],[xR,h,zC],[xL,h,zC], [0,1,0]);
+    // 斜面（朝 +z 并朝上）
+    quad([xL,h,zC],[xR,h,zC],[xR,lip,zF],[xL,lip,zF], [0,1,1]);
+    // 低端前墙（朝 +z）
+    quad([xL,0,zF],[xR,0,zF],[xR,lip,zF],[xL,lip,zF], [0,0,1]);
+    // 两端五边形截面 A-B-C-D-E（扇形三角化）
+    function cap(x, hint) {
+      const v = (z, y) => [x, y, z];
+      const A=v(zB,0), B=v(zB,h), C=v(zC,h), D=v(zF,lip), E=v(zF,0);
+      tri(A,B,C,hint); tri(A,C,D,hint); tri(A,D,E,hint);
+    }
+    cap(xL, [-1,0,0]);
+    cap(xR, [ 1,0,0]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(V, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  // 反斜坡（上大下小）：正斜坡的垂直镜像。
+  // 顶部满铺（满高+全部凸点），底部仅后端 0.85 落地，底面向前上方收，形成悬挑/骑楼状
+  // 剖面点：P1(zB,0)后底 P2(zB,h)后顶 P3(zF,h)前顶 P4(zF,h-lip)前唇底 P5(zC,0)斜面后端
+  function createInvertedSlopeGeometry(w, d, h, lip) {
+    const xL = -w / 2, xR = w / 2;
+    const zB = -d / 2, zF = d / 2;
+    const zC = -d / 2 + 0.85;
+    const V = [];
+    function tri(a, b, c, hint) {
+      const abx = b[0]-a[0], aby = b[1]-a[1], abz = b[2]-a[2];
+      const acx = c[0]-a[0], acy = c[1]-a[1], acz = c[2]-a[2];
+      const nx = aby*acz - abz*acy, ny = abz*acx - abx*acz, nz = abx*acy - aby*acx;
+      if (nx*hint[0] + ny*hint[1] + nz*hint[2] < 0) V.push(...a, ...c, ...b);
+      else V.push(...a, ...b, ...c);
+    }
+    function quad(a, b, c, dd, hint) { tri(a, b, c, hint); tri(a, c, dd, hint); }
+    // 高端背墙（满高，朝 -z）
+    quad([xL,0,zB],[xR,0,zB],[xR,h,zB],[xL,h,zB], [0,0,-1]);
+    // 顶部（满铺，朝上）
+    quad([xL,h,zB],[xR,h,zB],[xR,h,zF],[xL,h,zF], [0,1,0]);
+    // 前端唇墙（朝 +z 的窄条）
+    quad([xL,h-lip,zF],[xR,h-lip,zF],[xR,h,zF],[xL,h,zF], [0,0,1]);
+    // 斜面（朝下并朝 +z —— 悬挑底面）
+    quad([xL,0,zC],[xR,0,zC],[xR,h-lip,zF],[xL,h-lip,zF], [0,-1,1]);
+    // 后端落地底面（朝下）
+    quad([xL,0,zB],[xR,0,zB],[xR,0,zC],[xL,0,zC], [0,-1,0]);
+    // 两端五边形截面 P1-P2-P3-P4-P5（扇形三角化）
+    function cap(x, hint) {
+      const v = (z, y) => [x, y, z];
+      const P1=v(zB,0), P2=v(zB,h), P3=v(zF,h), P4=v(zF,h-lip), P5=v(zC,0);
+      tri(P1,P2,P3,hint); tri(P1,P3,P4,hint); tri(P1,P4,P5,hint);
+    }
+    cap(xL, [-1,0,0]);
+    cap(xR, [ 1,0,0]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(V, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }
+
   function createBrickMesh(typeKey, hex, rotIdx) {
     const t = BRICK_TYPES[typeKey];
     const w = t.w, d = t.d;
     const group = new THREE.Group();
+
+    if (t.slope) {
+      // ===== 斜坡（乐高式楔形）：后端满高+凸点，前端低矮，顶面为斜面 =====
+      const bodyGeo = createSlopeGeometry(w, d, BRICK_H, BRICK_H * 0.18);
+      const body = new THREE.Mesh(bodyGeo, getColorMat(hex));
+      body.renderOrder = 0;
+      group.add(body);
+
+      // 反转壳层勾边：同样楔形放大后用 BackSide
+      const _hullMat = new THREE.MeshBasicMaterial({
+        color: 0x333333, side: THREE.BackSide,
+      });
+      const hull = new THREE.Mesh(createSlopeGeometry(w * 1.03, d * 1.03, BRICK_H * 1.03, BRICK_H * 0.18 * 1.03), _hullMat);
+      hull.renderOrder = -1;
+      group.add(hull);
+
+      // 凸点只在高端（后端）那一排
+      for (let ix = 0; ix < w; ix++) {
+        const stud = new THREE.Mesh(studGeo, getColorMat(hex));
+        stud.position.set(-w/2 + ix + 0.5, BRICK_H + STUD_H/2, -d/2 + 0.5);
+        stud.renderOrder = 0;
+        stud.userData.parentGroup = group;
+        group.add(stud);
+        const studHullGeo = new THREE.CylinderGeometry(STUD_R * 1.06, STUD_R * 1.06, STUD_H * 1.03, 12);
+        const studHull = new THREE.Mesh(studHullGeo, _hullMat);
+        studHull.position.copy(stud.position);
+        studHull.renderOrder = -1;
+        group.add(studHull);
+      }
+      group.rotation.y = rotIdx * Math.PI / 2;
+      group.userData.isBrick = true;
+      body.userData.parentGroup = group;
+      return group;
+    }
+
+    if (t.invSlope) {
+      // ===== 反斜坡（上大下小）：满高屋顶+全部凸点，底面沿坡上收，前部下悬 =====
+      const bodyGeo = createInvertedSlopeGeometry(w, d, BRICK_H, BRICK_H * 0.18);
+      const body = new THREE.Mesh(bodyGeo, getColorMat(hex));
+      body.renderOrder = 0;
+      group.add(body);
+
+      const _hullMat = new THREE.MeshBasicMaterial({
+        color: 0x333333, side: THREE.BackSide,
+      });
+      const hull = new THREE.Mesh(createInvertedSlopeGeometry(w * 1.03, d * 1.03, BRICK_H * 1.03, BRICK_H * 0.18 * 1.03), _hullMat);
+      hull.renderOrder = -1;
+      group.add(hull);
+
+      // 凸点满铺（顶部是完整砖面）
+      for (let ix = 0; ix < w; ix++) {
+        for (let iz = 0; iz < d; iz++) {
+          const stud = new THREE.Mesh(studGeo, getColorMat(hex));
+          stud.position.set(-w/2 + ix + 0.5, BRICK_H + STUD_H/2, -d/2 + iz + 0.5);
+          stud.renderOrder = 0;
+          stud.userData.parentGroup = group;
+          group.add(stud);
+          const studHullGeo = new THREE.CylinderGeometry(STUD_R * 1.06, STUD_R * 1.06, STUD_H * 1.03, 12);
+          const studHull = new THREE.Mesh(studHullGeo, _hullMat);
+          studHull.position.copy(stud.position);
+          studHull.renderOrder = -1;
+          group.add(studHull);
+        }
+      }
+      group.rotation.y = rotIdx * Math.PI / 2;
+      group.userData.isBrick = true;
+      body.userData.parentGroup = group;
+      return group;
+    }
+
     const bodyGeo = new THREE.BoxGeometry(w, BRICK_H, d);
     const body = new THREE.Mesh(bodyGeo, getColorMat(hex));
     body.position.y = BRICK_H / 2;
@@ -1360,6 +2093,7 @@
         const stud = new THREE.Mesh(studGeo, getColorMat(hex));
         stud.position.set(-w/2 + ix + 0.5, BRICK_H + STUD_H/2, -d/2 + iz + 0.5);
         stud.renderOrder = 0;
+        stud.userData.parentGroup = group;
         group.add(stud);
         // 圆柱也加反转壳层勾边，放大率更小 = 更细
         const studHullGeo = new THREE.CylinderGeometry(STUD_R * 1.06, STUD_R * 1.06, STUD_H * 1.03, 12);
@@ -1395,7 +2129,7 @@
       const i = anchorI + ci;
       const k = anchorK + ck;
       if (!inBounds(i, k)) return false;
-      if (isRoad(i, k)) return false;  // 不能在道路上建
+      if (layer === 0 && isRoad(i, k)) return false;  // 地面层不能压在道路上；悬挑体块（layer≥1）可跨越道路
       if (hasGreenAt(i, k, layer)) return false;  // 不能在同层绿地上建（地面绿地=0层，屋顶绿地=N层）
       if (occupancy.has(occKey(i, k, layer))) return false;
       // 注意：允许悬空——建筑师推敲体量时悬挑是刚需
@@ -1464,6 +2198,9 @@
     }
     for (const k of greensToDelete) greenCells.delete(k);
     if (greensToDelete.length) rebuildGreenLayer();
+    // 砖拆了：被地面砖挡住的道路格可能需要"透"出来
+    rederiveRoadCells();
+    rebuildRoadLayer();
     updateStatus();
     autoSave();
   }
@@ -1481,12 +2218,17 @@
     }
     for (const k of roofGreens) greenCells.delete(k);
     if (roofGreens.length) rebuildGreenLayer();
+    rederiveRoadCells();
+    rebuildRoadLayer();
     updateStatus();
     autoSave();
   }
 
   function clearRoads() {
+    roadSegs.length = 0;
+    roadOrphanCells = [];
     roadCells.clear();
+    cancelRoadStart();
     rebuildRoadLayer();
     detectPlots();   // 道路变了，地块必须重算
     autoSave();
@@ -1544,13 +2286,6 @@
     }
   }
 
-  // 笔刷预览（道路模式下跟随鼠标的彩色方框）
-  let brushPreviewGroup = null;
-  const brushEdgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 0.08, 1));
-  const brushEdgeMat = new THREE.LineBasicMaterial({
-    color: 0xffd700, transparent: true, opacity: 0.7,
-  });
-
   const previewMat = new THREE.MeshStandardMaterial({
     color: curColor, transparent: true, opacity: 0.4,
     roughness: 0.4, metalness: 0.1,
@@ -1575,31 +2310,104 @@
   }
   rebuildPreview();
 
-  // 笔刷预览重建（改变 brushSize 时调用）
-  function rebuildBrushPreview() {
-    if (brushPreviewGroup) {
-      scene.remove(brushPreviewGroup);
-      brushPreviewGroup.traverse(o => {
-        if (o.isMesh || o.isLineSegments) o.geometry.dispose();
-      });
-    }
-    brushPreviewGroup = new THREE.Group();
-    const cells = getBrushCells();
-    const [hw, hd] = [Math.floor(brushSize.w / 2), Math.floor(brushSize.d / 2)];
-    const offsetI = -(brushSize.w - 1 - hw);
-    const offsetK = -(brushSize.d - 1 - hd);
-    for (const [di, dk] of cells) {
-      const line = new THREE.LineSegments(brushEdgeGeo, brushEdgeMat);
-      // 锚点 cell 中心世界偏移：(di - offsetI) 得到相对 brush 左上角的格子序号
-      const localI = di - offsetI;
-      const localK = dk - offsetK;
-      line.position.set(localI + 0.5 - brushSize.w / 2, 0.06, localK + 0.5 - brushSize.d / 2);
-      brushPreviewGroup.add(line);
-    }
-    brushPreviewGroup.visible = false;
-    scene.add(brushPreviewGroup);
+  // ============================================================
+  // 道路画线预览：橡皮筋条带 + 待删段高亮
+  // ============================================================
+  const roadPreviewGroup = new THREE.Group();
+  scene.add(roadPreviewGroup);
+  const roadPreviewMat = new THREE.MeshBasicMaterial({
+    color: 0x007aff, transparent: true, opacity: 0.4, side: THREE.DoubleSide, depthWrite: false
+  });
+  let roadHLMesh = null;
+  const roadHLMat = new THREE.MeshBasicMaterial({
+    color: 0xffd700, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false
+  });
+
+  function setPreviewStrip(ai, ak, bi, bk, w) {
+    clearGroupGeos(roadPreviewGroup);
+    const g = offsetCenterlineGrid(ai, ak, bi, bk, w);
+    // 格心 → 世界坐标
+    const ax = g.ax - HALF_W, az = g.az - HALF_H;
+    const bx = g.bx - HALF_W, bz = g.bz - HALF_H;
+    const pos = [];
+    buildStrip(pos, ax, az, bx, bz, w / 2, ROAD_CAP, 0.09);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    roadPreviewGroup.add(new THREE.Mesh(geo, roadPreviewMat));
+    roadPreviewGroup.visible = true;
   }
-  rebuildBrushPreview();
+
+  // 未点起点时的笔刷占位块：网格对齐的 w×w 方块（格坐标整数边界）
+  // 奇数 w：以悬停格为中心（边界落在半整数=格边，天然对齐）
+  // 偶数 w：以悬停格为 (+i,+k) 侧角，方块 [i,i+w]×[k,k+w]（与实际道路朝 +i/+k 偏移一致）
+  function setPreviewFootprint(i, k, w) {
+    clearGroupGeos(roadPreviewGroup);
+    let x0, z0, x1, z1;  // 格坐标方块范围
+    if (w % 2 === 0) {
+      x0 = i; x1 = i + w; z0 = k; z1 = k + w;
+    } else {
+      x0 = i + 0.5 - w / 2; x1 = i + 0.5 + w / 2;
+      z0 = k + 0.5 - w / 2; z1 = k + 0.5 + w / 2;
+    }
+    // 格坐标 → 世界坐标
+    x0 -= HALF_W; x1 -= HALF_W; z0 -= HALF_H; z1 -= HALF_H;
+    const y = 0.09;
+    const A = [x0, y, z0], B = [x1, y, z0], C = [x1, y, z1], D = [x0, y, z1];
+    const pos = [...A, ...C, ...B, ...A, ...D, ...C];
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    roadPreviewGroup.add(new THREE.Mesh(geo, roadPreviewMat));
+    roadPreviewGroup.visible = true;
+  }
+
+  function showSegHighlight(seg) {
+    if (roadHLMesh) {
+      scene.remove(roadHLMesh);
+      roadHLMesh.geometry.dispose();
+      roadHLMesh = null;
+    }
+    if (!seg) return;
+    const { ax, az, bx, bz } = segWorldPoints(seg);
+    const pos = [];
+    buildStrip(pos, ax, az, bx, bz, seg.w / 2 + 0.15, ROAD_CAP + 0.15, 0.085);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    roadHLMesh = new THREE.Mesh(g, roadHLMat);
+    scene.add(roadHLMesh);
+  }
+
+  // 道路模式每帧悬停反馈
+  function updateRoadPreview() {
+    if (mode !== 'road') {
+      roadPreviewGroup.visible = false;
+      showSegHighlight(null);
+      return;
+    }
+    const p = pickCell();
+    if (!p) {
+      roadPreviewGroup.visible = false;
+      showSegHighlight(null);
+      return;
+    }
+    if (toolAction === 'remove') {
+      // 拆除：悬停高亮整条道路段
+      roadPreviewGroup.visible = false;
+      if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+      showSegHighlight(findRoadSegAt(p.i, p.k));
+      return;
+    }
+    showSegHighlight(null);
+    if (roadStart) {
+      // 起点金色高柱 + 橡皮筋条带（终点应用正交磁吸）
+      setCellHighlight(roadStart.i, roadStart.k, true, 0.02, 1.5);
+      const mag = applyMagnet(roadStart.i, roadStart.k, p.i, p.k);
+      setPreviewStrip(roadStart.i, roadStart.k, mag.bi, mag.bk, roadWidth);
+    } else {
+      if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+      // 未选起点：脚下显示网格对齐的路宽占位块
+      setPreviewFootprint(p.i, p.k, roadWidth);
+    }
+  }
 
   function getRaycastTargets() {
     const arr = [ground];
@@ -1639,23 +2447,7 @@
     mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
-    // 道路模式：拖动涂路/擦路（放置模式只左键，删除模式也只左键）
-    if (dragStart && mode === 'road' && dragStart.button === 0) {
-      const p = pickCell();
-      if (p) {
-        if (toolAction === 'remove') {
-          // 删除模式：擦除笔刷覆盖的道路格子
-          const cells = getBrushCells();
-          for (const [ci, ck] of cells) {
-            const ti = p.i + ci, tk = p.k + ck;
-            toggleRoad(ti, tk, false);
-          }
-        } else {
-          toggleRoad(p.i, p.k, true);
-        }
-        rebuildRoadLayer();
-      }
-    }
+    // 道路模式不再拖动涂画（改为点击起点→终点画线），橡皮筋预览在 updatePreview 中处理
 
     // 地块-绿地模式：拖动连续画绿地（放置模式）或擦绿地（删除模式）
     if (dragStart && mode === 'plot' && plotTool === 'green' && dragStart.button === 0) {
@@ -1714,40 +2506,12 @@
   function updatePreview() {
     // 先隐藏所有预览
     previewMesh.visible = false;
-    if (brushPreviewGroup) brushPreviewGroup.visible = false;
+    roadPreviewGroup.visible = false;
 
     raycaster.setFromCamera(mouse, camera);
 
     if (mode === 'road') {
-      const intersects = raycaster.intersectObjects([ground], false);
-      if (!intersects.length) {
-        brushPreviewGroup.visible = false;
-        if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
-        return;
-      }
-      const p = intersects[0].point;
-      const i = worldToGridX(p.x);
-      const k = worldToGridZ(p.z);
-      const [x, z] = gridToWorld(i, k);
-
-      if (toolAction === 'remove') {
-        // 道路删除模式：悬停高亮道路格子
-        brushPreviewGroup.visible = false;
-        const key = i + ',' + k;
-        if (roadCells.has(key)) {
-          if (hoveredCellKey !== key) {
-            hoveredCellKey = key;
-            setCellHighlight(i, k, true, 0.03, 0.06);  // 道路 y=0.03 高度 0.06
-          }
-        } else {
-          if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
-        }
-      } else {
-        // 道路放置模式：显示笔刷预览
-        if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
-        brushPreviewGroup.position.set(x, 0, z);
-        brushPreviewGroup.visible = true;
-      }
+      updateRoadPreview();
       return;
     }
 
@@ -1890,9 +2654,9 @@
   renderer.domElement.addEventListener('pointerdown', (e) => {
     dragStart = { x: e.clientX, y: e.clientY, button: e.button };
     didDrag = false;
-    // 左键拖动批处理：道路放置/删除、绿地放置/删除
+    // 左键拖动批处理：绿地拖动连续画（道路已改为点击画线，不参与）
     if (e.button === 0) {
-      if (mode === 'road' || (mode === 'plot' && plotTool === 'green')) {
+      if (mode === 'plot' && plotTool === 'green') {
         beginDragBatch();
       }
     }
@@ -1912,13 +2676,17 @@
     const wasDragMode = dragMode;
     dragMode = null;
     if (wasDrag) {
-      // 道路/绿地拖完，重算地块 + 结束批处理
-      if (mode === 'road') {
-        detectPlots();
-        endDragBatch();
-      } else if (mode === 'plot' && plotTool === 'green') {
+      // 绿地拖完结束批处理（道路拖动已废弃）
+      if (mode === 'plot' && plotTool === 'green') {
         endDragBatch();
       }
+      return;
+    }
+
+    // 道路模式：右键单击取消画线起点（右键拖动仍是 OrbitControls 平移）
+    if (btn === 2 && mode === 'road' && roadStart) {
+      cancelRoadStart();
+      flashStatus('已取消画线');
       return;
     }
 
@@ -1933,25 +2701,39 @@
         const p = pickCell();
         if (!p) return;
         if (toolAction === 'remove') {
-          // 删除模式：删掉笔刷覆盖下的道路格子
-          const cells = getBrushCells();
-          let deleted = 0;
-          pushUndo();
-          for (const [ci, ck] of cells) {
-            const ti = p.i + ci, tk = p.k + ck;
-            if (roadCells.has(ti + ',' + tk)) {
-              toggleRoad(ti, tk, false);
-              deleted++;
-            }
+          // 拆除：点选整条道路段删除
+          const hit = findRoadSegAt(p.i, p.k);
+          if (hit) {
+            pushUndo();
+            roadSegs.splice(roadSegs.indexOf(hit), 1);
+            commitRoadsChange();
+            flashStatus('已删除一段道路');
+          } else {
+            flashStatus('没点到道路');
           }
-          if (deleted === 0) flashStatus('没点到道路');
         } else {
-          // 放置模式：笔刷涂路
-          pushUndo();
-          toggleRoad(p.i, p.k);
+          // 画线：第一次点击选起点，第二次点击选终点
+          if (!roadStart) {
+            roadStart = { i: p.i, k: p.k };
+            flashStatus('起点已选 — 点击终点画路（右键 / Esc 取消）');
+            updateRoadPreview();
+          } else if (roadStart.i === p.i && roadStart.k === p.k) {
+            cancelRoadStart();
+            flashStatus('已取消画线');
+          } else {
+            const mag = applyMagnet(roadStart.i, roadStart.k, p.i, p.k);
+            pushUndo();
+            roadSegs.push({
+              id: roadSegIdSeq++,
+              ai: roadStart.i, ak: roadStart.k,
+              bi: mag.bi, bk: mag.bk,
+              w: roadWidth,
+            });
+            cancelRoadStart();
+            commitRoadsChange();
+            flashStatus('道路已画');
+          }
         }
-        rebuildRoadLayer();
-        detectPlots();
       } else if (mode === 'plot') {
         const p = pickCell();
         if (plotTool === 'highlight') {
@@ -2134,6 +2916,9 @@
     } else if (e.key === '1') setMode('road');
     else if (e.key === '2') setMode('plot');
     else if (e.key === '3') setMode('build');
+    else if (e.key === 'Escape') {
+      if (mode === 'road' && roadStart) { cancelRoadStart(); flashStatus('已取消画线'); }
+    }
     else if (e.key === 'Delete' || e.key === 'Backspace') {
       if (mode === 'build' && hoveredBrick) { pushUndo(); removeBrick(hoveredBrick); hoveredBrick = null; }
     }
@@ -2143,10 +2928,11 @@
   // 10. UI
   // ============================================================
   function buildTypeButtons() {
+    const dict = I18N[currentLang];
     const list = document.getElementById('tool-list');
     list.innerHTML = '';
     if (mode === 'road') {
-      document.getElementById('tool-title').textContent = '道路工具';
+      document.getElementById('tool-title').textContent = dict['road-tools'] || '道路工具';
 
       // 放置/删除 切换
       const toolBar = document.createElement('div');
@@ -2154,12 +2940,12 @@
       const placeBtn = document.createElement('button');
       placeBtn.className = 'tool-btn' + (toolAction === 'place' ? ' active' : '');
       placeBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
-      placeBtn.textContent = '🔨 放置';
+      placeBtn.textContent = '🔨 ' + dict.place;
       placeBtn.onclick = () => setToolAction('place');
       const removeBtn = document.createElement('button');
       removeBtn.className = 'tool-btn' + (toolAction === 'remove' ? ' active' : '');
       removeBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
-      removeBtn.textContent = '🔧 拆除';
+      removeBtn.textContent = '🔧 ' + dict.remove;
       removeBtn.onclick = () => setToolAction('remove');
       toolBar.appendChild(placeBtn);
       toolBar.appendChild(removeBtn);
@@ -2168,51 +2954,49 @@
       if (toolAction === 'place') {
         const hint = document.createElement('div');
         hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
-        hint.innerHTML = '左键涂路<br>按住拖动连续画';
+        hint.innerHTML = dict['road-hint-place'] || '左键点击起点 →<br>再点击终点画路<br>靠近水平/竖直自动磁吸<br>右键 / Esc 取消';
         list.appendChild(hint);
       } else {
         const hint = document.createElement('div');
         hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
-        hint.innerHTML = '点击删除笔刷覆盖的道路格<br>按住拖动连续擦除';
+        hint.innerHTML = dict['road-hint-remove'] || '点击道路<br>删除整段';
         list.appendChild(hint);
       }
 
-      // 笔刷大小选择
+      // 路宽选择
       const lbl = document.createElement('div');
       lbl.style.cssText = 'font-size:10px;color:#888;text-align:center;margin:4px 0 2px;letter-spacing:1px;';
-      lbl.textContent = '笔刷大小';
+      lbl.textContent = dict['road-width'] || '道路宽度';
       list.appendChild(lbl);
 
-      for (let idx = 0; idx < BRUSH_PRESETS.length; idx++) {
-        const preset = BRUSH_PRESETS[idx];
+      for (let idx = 0; idx < ROAD_WIDTHS.length; idx++) {
+        const preset = ROAD_WIDTHS[idx];
         const btn = document.createElement('button');
-        btn.className = 'tool-btn' + (brushSize.w === preset.w && brushSize.d === preset.d ? ' active' : '');
+        btn.className = 'tool-btn' + (roadWidth === preset.w ? ' active' : '');
         btn.textContent = preset.label;
         btn.onclick = () => {
-          brushSize = { w: preset.w, d: preset.d };
-          rebuildBrushPreview();
-          // 更新按钮激活态
+          roadWidth = preset.w;
           list.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          flashStatus(`笔刷: ${preset.label}（${preset.w}×${preset.d}）`);
+          flashStatus(`路宽: ${preset.label}`);
           updatePreview();
         };
         list.appendChild(btn);
       }
     } else if (mode === 'plot') {
-      document.getElementById('tool-title').textContent = '地块工具';
+      document.getElementById('tool-title').textContent = dict['plot-tools'] || '地块工具';
       // 子工具切换
       const toolBar = document.createElement('div');
       toolBar.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;';
       const highlightBtn = document.createElement('button');
       highlightBtn.className = 'tool-btn' + (plotTool === 'highlight' ? ' active' : '');
       highlightBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
-      highlightBtn.textContent = '🔲 高亮';
+      highlightBtn.textContent = '🔲 ' + (dict['highlight'] || '高亮');
       highlightBtn.onclick = () => { plotTool = 'highlight'; buildTypeButtons(); updateCursor(); };
       const greenBtn = document.createElement('button');
       greenBtn.className = 'tool-btn' + (plotTool === 'green' ? ' active' : '');
       greenBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
-      greenBtn.textContent = '🌿 绿地';
+      greenBtn.textContent = '🌿 ' + (dict['green'] || '绿地');
       greenBtn.onclick = () => { plotTool = 'green'; buildTypeButtons(); updateCursor(); };
       toolBar.appendChild(highlightBtn);
       toolBar.appendChild(greenBtn);
@@ -2221,7 +3005,7 @@
       if (plotTool === 'highlight') {
         const hint = document.createElement('div');
         hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
-        hint.innerHTML = '左键高亮地块<br>右键取消高亮';
+        hint.innerHTML = dict['plot-hint-highlight'] || '左键高亮地块<br>右键取消高亮';
         list.appendChild(hint);
       } else if (plotTool === 'green') {
         // 放置/删除 切换
@@ -2230,12 +3014,12 @@
         const greenPlaceBtn = document.createElement('button');
         greenPlaceBtn.className = 'tool-btn' + (toolAction === 'place' ? ' active' : '');
         greenPlaceBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
-        greenPlaceBtn.textContent = '🔨 放置';
+        greenPlaceBtn.textContent = '🔨 ' + dict.place;
         greenPlaceBtn.onclick = () => setToolAction('place');
         const greenRemoveBtn = document.createElement('button');
         greenRemoveBtn.className = 'tool-btn' + (toolAction === 'remove' ? ' active' : '');
         greenRemoveBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
-        greenRemoveBtn.textContent = '🔧 拆除';
+        greenRemoveBtn.textContent = '🔧 ' + dict.remove;
         greenRemoveBtn.onclick = () => setToolAction('remove');
         toolBar2.appendChild(greenPlaceBtn);
         toolBar2.appendChild(greenRemoveBtn);
@@ -2244,39 +3028,39 @@
         if (toolAction === 'place') {
           const hint = document.createElement('div');
           hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
-          hint.innerHTML = '左键画绿地<br>按住拖动连续画';
+          hint.innerHTML = dict['green-hint-place'] || '左键画绿地<br>按住拖动连续画';
           list.appendChild(hint);
         } else {
           const hint = document.createElement('div');
           hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
-          hint.innerHTML = '点击删除绿地<br>按住拖动连续擦除';
+          hint.innerHTML = dict['green-hint-remove'] || '点击删除绿地<br>按住拖动连续擦除';
           list.appendChild(hint);
         }
       }
       const reBtn = document.createElement('button');
       reBtn.className = 'tool-btn';
-      reBtn.textContent = '重新识别地块';
-      reBtn.onclick = () => { detectPlots(); flashStatus('已重算 ' + plotCount + ' 个地块'); };
+      reBtn.textContent = dict['redetect'] || '重新识别地块';
+      reBtn.onclick = () => { detectPlots(); flashStatus((dict['redetect'] || '已重算') + ' ' + plotCount + ' ' + (dict['plots'] || '个地块')); };
       list.appendChild(reBtn);
     } else if (mode === 'build') {
-      document.getElementById('tool-title').textContent = '积木';
+      document.getElementById('tool-title').textContent = dict['build-tools'] || '积木';
       // 放置/移动/拆除 切换
       const toolBar = document.createElement('div');
       toolBar.style.cssText = 'display:flex;gap:4px;margin-bottom:6px;';
       const placeBtn = document.createElement('button');
       placeBtn.className = 'tool-btn' + (toolAction === 'place' ? ' active' : '');
       placeBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
-      placeBtn.textContent = '🔨 放置';
+      placeBtn.textContent = '🔨 ' + dict.place;
       placeBtn.onclick = () => setToolAction('place');
       const moveBtn = document.createElement('button');
       moveBtn.className = 'tool-btn' + (toolAction === 'move' ? ' active' : '');
       moveBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
-      moveBtn.textContent = '✋ 移动';
+      moveBtn.textContent = '✋ ' + dict.move;
       moveBtn.onclick = () => setToolAction('move');
       const removeBtn = document.createElement('button');
       removeBtn.className = 'tool-btn' + (toolAction === 'remove' ? ' active' : '');
       removeBtn.style.cssText = 'flex:1;padding:6px 0;font-size:11px;';
-      removeBtn.textContent = '🔧 拆除';
+      removeBtn.textContent = '🔧 ' + dict.remove;
       removeBtn.onclick = () => setToolAction('remove');
       toolBar.appendChild(placeBtn);
       toolBar.appendChild(moveBtn);
@@ -2287,10 +3071,11 @@
         const btn = document.createElement('button');
         btn.className = 'tool-btn brick-btn' + (key === curType ? ' active' : '');
         btn.dataset.type = key;
+        const bt = BRICK_TYPES[key];
         const label = document.createElement('div');
-        label.textContent = key.replace('x', '×');
+        label.textContent = bt.label || key.replace('x', '×');
         const c = document.createElement('canvas');
-        c.width = 70; c.height = 36;
+        c.width = 80; c.height = 52;
         btn.appendChild(c);
         btn.appendChild(label);
         drawBrickIcon(c, key);
@@ -2311,28 +3096,72 @@
     const W = canvas.width, H = canvas.height;
     ctx2.clearRect(0, 0, W, H);
     const t = BRICK_TYPES[typeKey];
-    const cx = W / 2, cy = H / 2 + 4;
-    const u = Math.min(W / (t.w + t.d) * 0.6, H / (t.w + t.d) * 0.6);
-    ctx2.fillStyle = '#9cc';
-    ctx2.strokeStyle = '#fff';
-    ctx2.lineWidth = 1;
-    ctx2.beginPath();
-    ctx2.moveTo(cx, cy - u * t.d);
-    ctx2.lineTo(cx + u * t.w, cy);
-    ctx2.lineTo(cx, cy + u * t.d);
-    ctx2.lineTo(cx - u * t.w, cy);
-    ctx2.closePath();
-    ctx2.fill();
-    ctx2.stroke();
-    ctx2.fillStyle = '#cde';
-    for (let i = 0; i < t.w; i++) {
-      for (let k = 0; k < t.d; k++) {
-        const sx = cx + (i - (t.w-1)/2 - (k-(t.d-1)/2)) * u * 0.6;
-        const sy = cy + (i - (t.w-1)/2 + (k-(t.d-1)/2)) * u * 0.35;
-        ctx2.beginPath();
-        ctx2.arc(sx, sy - 2, 1.6, 0, Math.PI * 2);
-        ctx2.fill();
-      }
+    const w = t.w, d = t.d;
+    const slope = !!t.slope;
+    const invSlope = !!t.invSlope;
+    // 等轴测投影：+x 向右下，+z 向左下，+y 向上
+    const u = Math.min(11, (W - 16) / (0.866 * (w + d)), (H - 16) / (0.5 * (w + d) + 1.0));
+    const ux = u * 0.866, uz = u * 0.5;
+    const uh = u * 0.85;                 // 一砖高
+    const lipY = (slope || invSlope) ? 0.18 : 0;  // 唇口高度比例
+    const cx = W / 2;
+    const cy = H * 0.58 - (w + d) * uz / 2 + uh / 2;
+    function P(x, y, z) {
+      return [cx + (x - z) * ux, cy + (x + z) * uz - y * uh];
+    }
+    const C_TOP = '#e6e6ec', C_SLOPE = '#d2d2dc', C_RIGHT = '#b0b0ba', C_LEFT = '#8c8c97',
+          C_SHADE = '#6d6d78', C_STROKE = '#585861';
+    ctx2.lineJoin = 'round';
+    function poly(pts, fill) {
+      ctx2.beginPath();
+      ctx2.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctx2.lineTo(pts[i][0], pts[i][1]);
+      ctx2.closePath();
+      ctx2.fillStyle = fill;
+      ctx2.fill();
+      ctx2.strokeStyle = C_STROKE;
+      ctx2.lineWidth = 0.8;
+      ctx2.stroke();
+    }
+    function stud(px, py) {
+      // 凸点：下半椭圆（厚度）+ 上半椭圆（顶面）
+      ctx2.beginPath();
+      ctx2.ellipse(px, py + 2.2, ux * 0.24, uz * 0.4, 0, 0, Math.PI * 2);
+      ctx2.fillStyle = C_RIGHT; ctx2.fill();
+      ctx2.beginPath();
+      ctx2.ellipse(px, py, ux * 0.24, uz * 0.4, 0, 0, Math.PI * 2);
+      ctx2.fillStyle = C_TOP; ctx2.fill();
+      ctx2.strokeStyle = C_STROKE; ctx2.lineWidth = 0.6; ctx2.stroke();
+    }
+    if (slope) {
+      // 楔形：z=0 高端满高，zc 为平台前沿，z=d 低端高 0.18
+      const zc = 0.85;
+      poly([P(0,0,d), P(w,0,d), P(w,lipY,d), P(0,lipY,d)], C_LEFT);                       // 前墙（z=d）
+      poly([P(w,0,0), P(w,1,0), P(w,1,zc), P(w,lipY,d), P(w,0,d)], C_RIGHT);             // 右立面（五边形）
+      poly([P(0,1,zc), P(w,1,zc), P(w,lipY,d), P(0,lipY,d)], C_SLOPE);                   // 斜面
+      poly([P(0,1,0), P(w,1,0), P(w,1,zc), P(0,1,zc)], C_TOP);                           // 顶部平台
+      for (let i = 0; i < w; i++) { const [sx, sy] = P(i + 0.5, 1, 0.5); stud(sx, sy); } // 凸点：高端一排
+    } else if (invSlope) {
+      // 反斜坡（上大下小）：满高屋顶，底面沿坡上收；zc 为落地段前沿
+      const zc = 0.85;
+      poly([P(0,0,zc), P(w,0,zc), P(w,1-lipY,d), P(0,1-lipY,d)], C_SHADE);                              // 悬挑底斜面（暗）
+      poly([P(0,1-lipY,d), P(w,1-lipY,d), P(w,1,d), P(0,1,d)], C_LEFT);                                 // 前端唇墙
+      poly([P(w,0,0), P(w,1,0), P(w,1,d), P(w,1-lipY,d), P(w,0,zc)], C_RIGHT);                          // 右立面（五边形）
+      poly([P(0,1,0), P(w,1,0), P(w,1,d), P(0,1,d)], C_TOP);                                            // 满铺顶面
+      for (let i = 0; i < w; i++)
+        for (let k = 0; k < d; k++) {
+          const [sx, sy] = P(i + 0.5, 1, k + 0.5);
+          stud(sx, sy);
+        }
+    } else {
+      poly([P(0,0,d), P(w,0,d), P(w,1,d), P(0,1,d)], C_LEFT);          // 左前立面（z=d）
+      poly([P(w,0,0), P(w,0,d), P(w,1,d), P(w,1,0)], C_RIGHT);         // 右前立面（x=w）
+      poly([P(0,1,0), P(w,1,0), P(w,1,d), P(0,1,d)], C_TOP);           // 顶面
+      for (let i = 0; i < w; i++)
+        for (let k = 0; k < d; k++) {
+          const [sx, sy] = P(i + 0.5, 1, k + 0.5);
+          stud(sx, sy);
+        }
     }
   }
 
@@ -2377,6 +3206,8 @@
     // 清除旧的 hover 高亮
     if (hoveredBrick) { setBrickHighlight(hoveredBrick, false); hoveredBrick = null; }
     if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+    if (roadStart) roadStart = null;          // 切换模式取消未完成的画线
+    showSegHighlight(null);
     mode = m;
     document.getElementById('mode-road').classList.toggle('active', m === 'road');
     document.getElementById('mode-plot').classList.toggle('active', m === 'plot');
@@ -2390,6 +3221,9 @@
     // 清除旧的 hover 高亮
     if (hoveredBrick) { setBrickHighlight(hoveredBrick, false); hoveredBrick = null; }
     if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
+    // 切换放置/拆除时取消未完成的画线
+    if (roadStart) roadStart = null;
+    showSegHighlight(null);
     // 退出 move 模式时取消正在移动的积木
     if (movingBrick && a !== 'move') {
       movingBrick.group.visible = true;
@@ -2441,8 +3275,8 @@
   const latInput = document.getElementById('sp-lat');
   const latV = document.getElementById('sp-lat-v');
   const dateSelect = document.getElementById('sp-date');
-  const northInput = document.getElementById('sp-north');
-  const northV = document.getElementById('sp-north-v');
+  const northInput = document.getElementById('top-north');      // 北方向调整已移至顶栏
+  const northV = document.getElementById('top-north-v');
   const sunInfo = document.getElementById('sun-info');
 
   function bindSunUI() {
@@ -2455,6 +3289,20 @@
   latInput.oninput = bindSunUI;
   dateSelect.onchange = bindSunUI;
   northInput.oninput = bindSunUI;
+  document.getElementById('top-north-reset').onclick = () => {
+    northInput.value = 0;
+    bindSunUI();
+  };
+  // 语言切换下拉
+  document.getElementById('lang-toggle').onclick = (e) => {
+    e.stopPropagation();
+    document.querySelector('.lang-dropdown').classList.toggle('open');
+  };
+  document.querySelectorAll('.lang-option').forEach(opt => {
+    opt.onclick = () => setLang(opt.dataset.lang);
+  });
+  applyLang();
+
   bindSunUI();
 
   // 一键日照分析
@@ -2481,7 +3329,7 @@
     scene.getObjectByName('sun-overlay')?.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
     scene.getObjectByName('sun-overlay') && scene.remove(scene.getObjectByName('sun-overlay'));
 
-    if (bricks.length === 0) { flash('先建点东西再分析'); return; }
+    if (bricks.length === 0) { flashStatus('先建点东西再分析'); return; }
 
     // 对每栋积木，计算其四个立面在给定日期下的日照小时数
     // 简化版：只考虑"该立面在某个时刻是否被其他积木遮挡"
@@ -2614,7 +3462,7 @@
       南向总日照: <b>${southFaces.toFixed(1)}h</b> / 北向: <b>${northFaces.toFixed(1)}h</b><br>
       <span style="font-size:9px;color:#999">⚪灰=0h 🟡黄=1-2h 🟠橙=2-4h 🔴红=4h+</span>
     `;
-    flash('日照分析完成 ✓');
+    flashStatus('日照分析完成 ✓');
   }
 
   // 画布大小预设
@@ -2656,7 +3504,7 @@
     onResize();
     // 重置视角以适应新画布
     const d = Math.max(GRID_W, GRID_H);
-    camera.position.set(d * 0.6, d * 0.72, d * 0.6);
+    camera.position.set(d * 0.6, d * 0.72, -d * 0.6);
     controls.target.set(0, 4, 0);
     controls.update();
     flashStatus(`画布已设为 ${w}×${h}（每格 ${m}m）`);
@@ -2667,7 +3515,7 @@
     document.getElementById('view-iso').classList.add('active');
     document.getElementById('view-top').classList.remove('active');
     const d = Math.max(GRID_W, GRID_H);
-    animateCameraTo(d * 0.6, d * 0.72, d * 0.6, 0, 4, 0);
+    animateCameraTo(d * 0.6, d * 0.72, -d * 0.6, 0, 4, 0);
   };
   document.getElementById('view-top').onclick = () => {
     document.getElementById('view-top').classList.add('active');
@@ -2775,17 +3623,16 @@
   // 11. 状态栏 / 临时提示
   // ============================================================
   function updateStatus() {
+    const dict = I18N[currentLang];
     document.getElementById('cur-canvas').textContent = GRID_W + '×' + GRID_H;
     document.getElementById('cur-meter').textContent = METER_PER_CELL + 'm';
     const totalArea = GRID_W * GRID_H * METER_PER_CELL * METER_PER_CELL;
     document.getElementById('cur-area').textContent = totalArea.toLocaleString() + '㎡';
-    const roadPct = roadCells.size / (GRID_W * GRID_H) * 100;
-    document.getElementById('cur-road').textContent = roadPct.toFixed(1) + '%';
     document.getElementById('cur-plots').textContent = plotCount;
     document.getElementById('cur-bricks').textContent = bricks.length;
     // 顶部尺度显示
     document.getElementById('scale-readout').textContent =
-      `画布 ${GRID_W * METER_PER_CELL}m × ${GRID_H * METER_PER_CELL}m`;
+      `${dict['scale-prefix'] || '画布'} ${GRID_W * METER_PER_CELL}m × ${GRID_H * METER_PER_CELL}m`;
     // 刷新全局指标面板
     updateMetricsPanel();
   }
@@ -2798,19 +3645,21 @@
   function fmtNum(v) { return v.toFixed(2); }
 
   function updateMetricsPanel() {
+    const dict = I18N[currentLang];
     // 全局指标：渲染到底部状态栏第二行（横排）
     const sbEl = document.getElementById('sb-metrics');
     if (sbEl) {
       const m = computeMetrics();
       sbEl.innerHTML = `
-        <span>GFA <b>${fmtArea(m.gfa)}</b></span>
-        <span>FAR 容积率 <b class="${m.far > 8 ? 'warn' : ''}">${fmtNum(m.far)}</b></span>
-        <span>建筑密度 <b>${fmtPct(m.buildingDensity)}</b></span>
-        <span>绿地率 <b>${fmtPct(m.greenRate)}</b></span>
-        <span>道路率 <b>${fmtPct(m.roadRate)}</b></span>
-        <span>平均层数 <b>${fmtNum(m.avgFloors)} 层</b></span>
-        <span>人口 <b>${m.population.toLocaleString()}</b></span>
-        <span>人口密度 <b>${m.popDensity.toLocaleString()} 人/㎢</b></span>
+        <span>${dict.gfa} <b>${fmtArea(m.gfa)}</b></span>
+        <span>${dict.fsi} <b class="${m.far > 8 ? 'warn' : ''}">${fmtNum(m.far)}</b></span>
+        <span>${dict.gsi} <b>${fmtPct(m.buildingDensity)}</b></span>
+        <span>${dict.osr} <b>${fmtNum(m.osr)}</b></span>
+        <span>${dict['green-rate']} <b>${fmtPct(m.greenRate)}</b></span>
+        <span>${dict['road-rate']} <b>${fmtPct(m.roadRate)}</b></span>
+        <span>${dict['avg-floors']} <b>${fmtNum(m.avgFloors)} ${dict['floors-unit']}</b></span>
+        <span>${dict['projected-pop']} <b>${m.population.toLocaleString()}</b></span>
+        <span>${dict['pop-density']} <b>${m.popDensity.toLocaleString()} ${dict['per-cell-unit']}</b></span>
       `;
     }
     // 高亮地块指标：保持在右侧栏
@@ -2820,19 +3669,20 @@
         const pm = computePlotMetrics(highlightedPlot);
         if (pm) {
           plotEl.innerHTML = `
-            <div class="m-row"><span>地块</span><b>#${highlightedPlot}</b></div>
-            <div class="m-row"><span>面积</span><b>${fmtArea(pm.plotArea)}</b></div>
-            <div class="m-row"><span>GFA</span><b>${fmtArea(pm.gfa)}</b></div>
-            <div class="m-row"><span>容积率</span><b>${fmtNum(pm.far)}</b></div>
-            <div class="m-row"><span>建筑密度</span><b>${fmtPct(pm.buildingDensity)}</b></div>
-            <div class="m-row"><span>绿地率</span><b>${fmtPct(pm.greenRate)}</b></div>
-            <div class="m-row"><span>平均层数</span><b>${fmtNum(pm.avgFloors)} 层</b></div>
+            <div class="m-row"><span>${dict['plot-id']}</span><b>#${highlightedPlot}</b></div>
+            <div class="m-row"><span>${dict['area']}</span><b>${fmtArea(pm.plotArea)}</b></div>
+            <div class="m-row"><span>${dict.gfa}</span><b>${fmtArea(pm.gfa)}</b></div>
+            <div class="m-row"><span>${dict.fsi}</span><b>${fmtNum(pm.far)}</b></div>
+            <div class="m-row"><span>${dict.gsi}</span><b>${fmtPct(pm.buildingDensity)}</b></div>
+            <div class="m-row"><span>${dict.osr}</span><b>${fmtNum(pm.osr)}</b></div>
+            <div class="m-row"><span>${dict['green-rate']}</span><b>${fmtPct(pm.greenRate)}</b></div>
+            <div class="m-row"><span>${dict['avg-floors']}</span><b>${fmtNum(pm.avgFloors)} ${dict['floors-unit']}</b></div>
           `;
         } else {
-          plotEl.innerHTML = '<div class="m-row" style="color:#888">该地块无数据</div>';
+          plotEl.innerHTML = `<div class="m-row" style="color:#888">${dict['no-plot-data'] || '该地块无数据'}</div>`;
         }
       } else {
-        plotEl.innerHTML = '<div class="m-row" style="color:#888">点击地块查看指标</div>';
+        plotEl.innerHTML = `<div class="m-row" style="color:#888">${dict['click-plot']}</div>`;
       }
     }
   }
@@ -2857,6 +3707,7 @@
     return {
       version: 1,
       grid: { w: GRID_W, h: GRID_H, m: METER_PER_CELL },
+      roadSegs: roadSegs.map(s => ({ ai: s.ai, ak: s.ak, bi: s.bi, bk: s.bk, w: s.w })),
       roads: Array.from(roadCells),
       greens: Array.from(greenCells.entries()).map(([key, layer]) => ({ key, layer })),
       bricks: bricks.map(b => ({
@@ -2881,8 +3732,18 @@
       rebuildGround();
       onResize();
     }
-    if (Array.isArray(data.roads)) {
-      for (const key of data.roads) roadCells.add(key);
+    if (Array.isArray(data.roadSegs)) {
+      // 新版：线段数据（id 重新分配）
+      for (const s of data.roadSegs) {
+        roadSegs.push({ id: roadSegIdSeq++, ai: s.ai, ak: s.ak, bi: s.bi, bk: s.bk, w: s.w || 2 });
+      }
+      roadOrphanCells = [];
+      rederiveRoadCells();
+      rebuildRoadLayer();
+    } else if (Array.isArray(data.roads)) {
+      // 旧版：只有格子，退化为 orphan 逐格渲染
+      roadOrphanCells = data.roads.slice();
+      rederiveRoadCells();
       rebuildRoadLayer();
     }
     if (Array.isArray(data.greens)) {
@@ -2943,6 +3804,23 @@
   updateCursor();
   loadFromStorage();
 
+  // 指北针：每帧把"世界北方（含 northAngle 设置）"投影到屏幕，罗盘随之旋转
+  const compassEl = document.getElementById('compass');
+  const _cp0 = new THREE.Vector3(), _cp1 = new THREE.Vector3();
+  function updateCompass() {
+    const th = sunConfig.northAngle * Math.PI / 180;
+    const nx = Math.sin(th), nz = Math.cos(th);   // 北方向：northAngle 为偏离 +Z 轴的角度
+    _cp0.copy(controls.target);
+    _cp1.set(controls.target.x + nx, controls.target.y, controls.target.z + nz);
+    _cp0.project(camera);
+    _cp1.project(camera);
+    const dx = _cp1.x - _cp0.x, dy = _cp1.y - _cp0.y;   // NDC（y 向上为正）
+    if (dx * dx + dy * dy < 1e-10) return;
+    // 北向在屏幕上相对"正上方"的顺时针角（CSS rotate 顺时针）
+    const ang = Math.atan2(dx, dy) * 180 / Math.PI;
+    compassEl.style.transform = 'rotate(' + ang.toFixed(2) + 'deg)';
+  }
+
   function animate() {
     requestAnimationFrame(animate);
     controls.update();
@@ -2954,6 +3832,7 @@
     if (previewMesh && previewMesh.visible) {
       previewMat.opacity = 0.35 + 0.1 * Math.sin(performance.now() * 0.005);
     }
+    updateCompass();
     renderer.render(scene, camera);
   }
   animate();
