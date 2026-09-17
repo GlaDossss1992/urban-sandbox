@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <title>城市设计沙盒 v0.1</title>
+  <title>Urban Sandbox v0.1</title>
   <style>
     /* ===== Apple 浅色风格 Design Tokens ===== */
     :root {
@@ -440,6 +440,99 @@
     input[type=file] { display: none; }
 
     /* ===== Welcome Overlay ===== */
+    /* ===== 存档栏位弹窗 ===== */
+    #slots-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 9500;
+      background: rgba(245,245,247,0.85);
+      backdrop-filter: blur(20px) saturate(1.8);
+      -webkit-backdrop-filter: blur(20px) saturate(1.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn .25s ease-out;
+    }
+    #slots-modal.hidden { display: none; }
+    .slots-card {
+      width: min(640px, calc(100vw - 40px));
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md), 0 20px 60px rgba(0,0,0,0.12);
+      padding: 22px 24px;
+      animation: popIn .3s ease-out;
+    }
+    .slots-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .slots-head h2 { font-size: 18px; font-weight: 700; margin: 0; }
+    .slots-close {
+      width: 30px; height: 30px;
+      border: none; border-radius: var(--radius-sm);
+      background: var(--surface-alt);
+      color: var(--text-secondary);
+      font-size: 15px; cursor: pointer;
+    }
+    .slots-close:hover { background: #e5e5ea; }
+    .slot-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px;
+      border: 1px solid var(--border, #e5e5ea);
+      border-radius: var(--radius-md);
+      margin-bottom: 10px;
+      background: var(--surface);
+    }
+    .slot-card.empty {
+      border-style: dashed;
+      background: var(--surface-alt);
+      color: var(--text-tertiary);
+    }
+    .slot-thumb {
+      width: 120px; height: 75px;
+      border-radius: var(--radius-sm);
+      object-fit: cover;
+      background: var(--surface-alt);
+      flex-shrink: 0;
+      border: 1px solid var(--border, #e5e5ea);
+    }
+    .slot-thumb-placeholder {
+      width: 120px; height: 75px;
+      border-radius: var(--radius-sm);
+      background: var(--surface-alt);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+      flex-shrink: 0;
+    }
+    .slot-info { flex: 1; min-width: 0; }
+    .slot-name {
+      font-size: 14px; font-weight: 600; color: var(--text);
+      margin: 0 0 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .slot-meta { font-size: 12px; color: var(--text-tertiary); }
+    .slot-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .slot-btn {
+      padding: 6px 12px;
+      font-size: 12px; font-weight: 600;
+      border: none; border-radius: var(--radius-sm);
+      background: var(--surface-alt);
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .slot-btn:hover { background: #e5e5ea; }
+    .slot-btn.primary { background: #0071e3; color: #fff; }
+    .slot-btn.primary:hover { background: #0077ed; }
+    .slot-btn.danger { color: #d70015; }
+    .slot-btn.danger:hover { background: #ffe3e6; }
+
     #welcome {
       position: fixed;
       inset: 0;
@@ -637,6 +730,17 @@
     </div>
   </div>
 
+  <!-- ===== 存档栏位弹窗 ===== -->
+  <div id="slots-modal" class="hidden">
+    <div class="slots-card">
+      <div class="slots-head">
+        <h2 data-i18n="slots-title">📦 存档栏位</h2>
+        <button class="slots-close" id="slots-close" title="关闭">✕</button>
+      </div>
+      <div id="slots-list"></div>
+    </div>
+  </div>
+
   <!-- ===== 顶部工具条 ===== -->
   <div id="topbar">
     <div class="group">
@@ -744,6 +848,7 @@
       <button class="action-btn" id="btn-redetect" data-i18n="redetect">重算地块</button>
       <button class="action-btn" id="btn-save" data-i18n="export-json">导出 JSON</button>
       <button class="action-btn" id="btn-load" data-i18n="import-json">导入 JSON</button>
+      <button class="action-btn" id="btn-slots" data-i18n="slots-btn">📦 存档栏位</button>
       <input type="file" id="file-input" accept=".json,application/json">
 
       <h3 data-i18n="viz">📊 可视化</h3>
@@ -814,6 +919,188 @@
     }, { once: false });
   })();
 
+  // ===== 存档栏位（5 个本地快照槽） =====
+  (function initSlots() {
+    const SLOT_COUNT = 5;
+    const slotKey = n => 'urban_sandbox_slot_' + n;
+    const modal = document.getElementById('slots-modal');
+    const listEl = document.getElementById('slots-list');
+    const openBtn = document.getElementById('btn-slots');
+    if (!modal || !listEl || !openBtn) return;
+
+    const tt = (key, vars) => {
+      let s = (I18N[currentLang] && I18N[currentLang][key]) || key;
+      if (vars) for (const k in vars) s = s.replace('{' + k + '}', vars[k]);
+      return s;
+    };
+    const fmtTime = ts => {
+      const d = new Date(ts);
+      const p = x => String(x).padStart(2, '0');
+      return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    };
+    const readSlot = n => {
+      try { const raw = localStorage.getItem(slotKey(n)); return raw ? JSON.parse(raw) : null; }
+      catch (e) { return null; }
+    };
+    const writeSlot = (n, rec) => localStorage.setItem(slotKey(n), JSON.stringify(rec));
+
+    // 立即渲染一帧并截取缩略图（缩到 240×150，JPEG 压缩）
+    function captureThumb() {
+      try {
+        renderer.render(scene, camera);
+        const src = renderer.domElement;
+        const W = 240, H = 150;
+        const cv = document.createElement('canvas');
+        cv.width = W; cv.height = H;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#e8e8ed';
+        ctx.fillRect(0, 0, W, H);
+        // cover 裁剪
+        const sa = src.width / src.height, da = W / H;
+        let sw = src.width, sh = src.height, sx = 0, sy = 0;
+        if (sa > da) { sw = src.height * da; sx = (src.width - sw) / 2; }
+        else { sh = src.width / da; sy = (src.height - sh) / 2; }
+        ctx.drawImage(src, sx, sy, sw, sh, 0, 0, W, H);
+        return cv.toDataURL('image/jpeg', 0.65);
+      } catch (e) { return ''; }
+    }
+
+    function saveToSlot(n) {
+      const old = readSlot(n);
+      if (old && !confirm(tt('slot-overwrite-cfm', { n, name: old.name }))) return;
+      const rec = {
+        name: old ? old.name : tt('slot-default-name', { n }),
+        time: Date.now(),
+        thumb: captureThumb(),
+        data: serialize(),
+      };
+      try {
+        writeSlot(n, rec);
+      } catch (e) {
+        alert('保存失败：本地存储空间不足');
+        return;
+      }
+      flashStatus(tt('slot-saved', { n }));
+      refreshList();
+    }
+
+    function loadFromSlot(n) {
+      const rec = readSlot(n);
+      if (!rec) return;
+      if (!confirm(tt('slot-load-cfm'))) return;
+      loadFrom(rec.data);
+      autoSave();
+      flashStatus(tt('slot-loaded'));
+      closeModal();
+    }
+
+    function deleteFromSlot(n) {
+      const rec = readSlot(n);
+      if (!rec) return;
+      if (!confirm(tt('slot-delete-cfm', { n, name: rec.name }))) return;
+      localStorage.removeItem(slotKey(n));
+      flashStatus(tt('slot-deleted'));
+      refreshList();
+    }
+
+    function renameSlot(n) {
+      const rec = readSlot(n);
+      if (!rec) return;
+      const name = prompt(tt('slot-rename-prompt'), rec.name);
+      if (name === null) return;
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      rec.name = trimmed.slice(0, 30);
+      writeSlot(n, rec);
+      refreshList();
+    }
+
+    const mkBtn = (label, cls, onClick) => {
+      const b = document.createElement('button');
+      b.className = 'slot-btn' + (cls ? ' ' + cls : '');
+      b.textContent = label;
+      b.addEventListener('click', onClick);
+      return b;
+    };
+
+    function refreshList() {
+      listEl.innerHTML = '';
+      for (let n = 1; n <= SLOT_COUNT; n++) {
+        const rec = readSlot(n);
+        const card = document.createElement('div');
+        card.className = 'slot-card' + (rec ? '' : ' empty');
+        if (rec) {
+          if (rec.thumb) {
+            const img = document.createElement('img');
+            img.className = 'slot-thumb';
+            img.src = rec.thumb;
+            img.alt = rec.name;
+            card.appendChild(img);
+          } else {
+            const ph = document.createElement('div');
+            ph.className = 'slot-thumb-placeholder';
+            ph.textContent = '🏙️';
+            card.appendChild(ph);
+          }
+          const info = document.createElement('div');
+          info.className = 'slot-info';
+          const name = document.createElement('div');
+          name.className = 'slot-name';
+          name.textContent = `${n}. ${rec.name}`;
+          const meta = document.createElement('div');
+          meta.className = 'slot-meta';
+          meta.textContent = tt('slot-meta', {
+            bricks: (rec.data.bricks || []).length,
+            roads: (rec.data.roadSegs || []).length,
+            time: fmtTime(rec.time),
+          });
+          info.appendChild(name);
+          info.appendChild(meta);
+          card.appendChild(info);
+
+          const actions = document.createElement('div');
+          actions.className = 'slot-actions';
+          actions.appendChild(mkBtn(tt('slot-rename'), '', () => renameSlot(n)));
+          actions.appendChild(mkBtn(tt('slot-save'), '', () => saveToSlot(n)));
+          actions.appendChild(mkBtn(tt('slot-load'), 'primary', () => loadFromSlot(n)));
+          actions.appendChild(mkBtn(tt('slot-delete'), 'danger', () => deleteFromSlot(n)));
+          card.appendChild(actions);
+        } else {
+          const ph = document.createElement('div');
+          ph.className = 'slot-thumb-placeholder';
+          ph.textContent = '📦';
+          card.appendChild(ph);
+          const info = document.createElement('div');
+          info.className = 'slot-info';
+          const name = document.createElement('div');
+          name.className = 'slot-name';
+          name.textContent = `${n}. ${tt('slot-empty')}`;
+          info.appendChild(name);
+          card.appendChild(info);
+          const actions = document.createElement('div');
+          actions.className = 'slot-actions';
+          actions.appendChild(mkBtn(tt('slot-save'), 'primary', () => saveToSlot(n)));
+          card.appendChild(actions);
+        }
+        listEl.appendChild(card);
+      }
+    }
+
+    function openModal() { refreshList(); modal.classList.remove('hidden'); }
+    function closeModal() { modal.classList.add('hidden'); }
+
+    openBtn.addEventListener('click', openModal);
+    document.getElementById('slots-close').addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+    });
+    // 语言切换后重渲染卡片
+    document.addEventListener('app:langchanged', () => {
+      if (!modal.classList.contains('hidden')) refreshList();
+    });
+  })();
+
   // ============================================================
   // 1. 配置常量
   // ============================================================
@@ -876,6 +1163,22 @@
       'redetect': '重算地块',
       'export-json': '导出 JSON',
       'import-json': '导入 JSON',
+      'slots-btn': '📦 存档栏位',
+      'slots-title': '📦 存档栏位',
+      'slot-empty': '空栏位',
+      'slot-save': '保存',
+      'slot-load': '读取',
+      'slot-delete': '删除',
+      'slot-rename': '改名',
+      'slot-saved': '已存入栏位 {n}',
+      'slot-loaded': '已读取存档',
+      'slot-deleted': '存档已删除',
+      'slot-overwrite-cfm': '栏位 {n} 已有存档「{name}」，确定覆盖？',
+      'slot-load-cfm': '读取存档将替换当前场景，未保存的改动会丢失。确定读取？',
+      'slot-delete-cfm': '确定删除栏位 {n} 的存档「{name}」？',
+      'slot-rename-prompt': '输入存档名称：',
+      'slot-default-name': '存档 {n}',
+      'slot-meta': '{bricks} 块建筑 · {roads} 段道路 · {time}',
       // 可视化
       'viz': '📊 可视化',
       'off': '关闭',
@@ -917,6 +1220,7 @@
       'plot-hint-highlight': '左键高亮地块<br>右键取消高亮',
       'green-hint-place': '左键画绿地<br>按住拖动连续画',
       'green-hint-remove': '点击删除绿地<br>按住拖动连续擦除',
+      'move-hint': '点击积木选中<br>拖红/绿/蓝箭头<br>沿 X/Y/Z 轴逐格移动<br>点空白或右键取消',
       // 状态/提示
       'saved': '已保存',
       'road-on-green': '绿地不能压道路',
@@ -979,6 +1283,22 @@
       'redetect': 'Redetect plots',
       'export-json': 'Export JSON',
       'import-json': 'Import JSON',
+      'slots-btn': '📦 Save Slots',
+      'slots-title': '📦 Save Slots',
+      'slot-empty': 'Empty slot',
+      'slot-save': 'Save',
+      'slot-load': 'Load',
+      'slot-delete': 'Delete',
+      'slot-rename': 'Rename',
+      'slot-saved': 'Saved to slot {n}',
+      'slot-loaded': 'Slot loaded',
+      'slot-deleted': 'Slot deleted',
+      'slot-overwrite-cfm': 'Slot {n} already holds "{name}". Overwrite it?',
+      'slot-load-cfm': 'Loading will replace the current scene. Unsaved changes will be lost. Continue?',
+      'slot-delete-cfm': 'Delete slot {n} ("{name}")?',
+      'slot-rename-prompt': 'Enter a new name:',
+      'slot-default-name': 'Save {n}',
+      'slot-meta': '{bricks} blocks · {roads} roads · {time}',
       'viz': '📊 Visualization',
       'off': 'Off',
       'far': 'FAR',
@@ -1015,6 +1335,7 @@
       'plot-hint-highlight': 'Left-click to highlight<br>Right-click to clear',
       'green-hint-place': 'Click to paint green<br>Drag to paint continuously',
       'green-hint-remove': 'Click to delete green<br>Drag to erase continuously',
+      'move-hint': 'Click a brick to select<br>Drag arrows to move cell-by-cell<br>Drag purple ring to rotate 90°<br>Click empty / right-click to cancel',
       'saved': 'Saved',
       'road-on-green': 'Cannot paint road on green',
       'road-on-build': 'Cannot paint road through buildings',
@@ -1061,6 +1382,7 @@
     // 刷新动态面板（指标、地块详情、工具列表）
     updateMetricsPanel();
     if (typeof buildTypeButtons === 'function') buildTypeButtons();
+    document.dispatchEvent(new CustomEvent('app:langchanged'));
   }
 
   // 切换到指定语言
@@ -1143,7 +1465,8 @@
 
   // 建筑模式下的工具：'place' 放积木 | 'remove' 拆积木 | 'move' 移动积木
   let toolAction = 'place';
-  let movingBrick = null;  // 正在被移动的积木（move 模式）
+  let moveSelBrick = null;  // move 模式选中的积木（显示 XYZ 三轴 gizmo）
+  let gizmoDrag = null;     // 轴拖拽状态 { axis, baseI/K/Layer, curI/K/Layer, startCoord }
 
   // ============================================================
   // 撤销系统：快照栈
@@ -2568,30 +2891,25 @@
       return;
     }
 
-    if (toolAction === 'move' && movingBrick) {
-      // 移动模式：preview 跟随鼠标，显示 movingBrick 的形状和类型
-      const intersects = raycaster.intersectObjects(getRaycastTargets(), true);
-      const p = computePlacement(intersects);
-      previewMesh.visible = !!p;
-      if (!p) return;
-      const fp = getFootprint(movingBrick.type, movingBrick.rotIdx);
-      const ok = canPlace(movingBrick.type, movingBrick.rotIdx, p.i, p.k, p.layer);
-      previewValid = ok;
-      const [x, z] = gridToWorld(p.i, p.k);
-      previewMesh.position.set(
-        x + fp.w / 2 - 0.5,
-        p.layer * BRICK_H,
-        z + fp.d / 2 - 0.5
-      );
-      previewMesh.rotation.y = movingBrick.rotIdx * Math.PI / 2;
-      previewMat.color.set(ok ? movingBrick.color : '#ff3030');
-      if (hoveredBrick) { setBrickHighlight(hoveredBrick, false); hoveredBrick = null; }
-      return;
-    }
-
-    if (toolAction === 'move' && !movingBrick) {
-      // move 模式但还没选中积木：悬停高亮可移动的积木
+    if (toolAction === 'move') {
       previewMesh.visible = false;
+      // 选中积木已被删除 → 自动取消选择
+      if (moveSelBrick && bricks.indexOf(moveSelBrick) === -1) selectMoveBrick(null);
+      refreshGizmoVisibility();
+      if (gizmoDrag) {
+        renderer.domElement.style.cursor = 'grabbing';
+        if (hoveredBrick) { setBrickHighlight(hoveredBrick, false); hoveredBrick = null; }
+        return;
+      }
+      // gizmo 箭头悬停高亮
+      let hoverAxis = null;
+      if (moveSelBrick) {
+        const gh = raycaster.intersectObjects(gizmoGroup.children, true);
+        if (gh.length) hoverAxis = gh[0].object.userData.gizmoAxis || null;
+      }
+      setGizmoHover(hoverAxis);
+      renderer.domElement.style.cursor = hoverAxis ? 'move' : '';
+      // 积木悬停高亮（提示可点选）
       const intersects = raycaster.intersectObjects(getRaycastTargets(), true);
       const hit = intersects.find(h => h.object !== ground);
       let newHovered = null;
@@ -2626,9 +2944,12 @@
 
   // 外轮廓高亮：线框独立加到 scene，手动算世界坐标避免 group 旋转继承问题
   const _hlMat = new THREE.LineBasicMaterial({ color: 0xffd700, depthTest: false });
+  const _hlEdgeMap = new WeakMap();   // brick 记录 → 高亮线框（记录对象无 userData，用 WeakMap）
   function setBrickHighlight(brick, on) {
+    if (!brick) return;
+    const existing = _hlEdgeMap.get(brick);
     if (on) {
-      if (brick.userData.highlightEdge) return;
+      if (existing) return;
       // 用原始 w/d，不交换——旋转由 worldPos 里的 quaternion 处理
       const t = BRICK_TYPES[brick.type];
       const edgeGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(t.w * 1.01, BRICK_H * 1.01, t.d * 1.01));
@@ -2640,15 +2961,275 @@
       edgeLines.quaternion.copy(brick.group.quaternion);
       edgeLines.renderOrder = 999;
       scene.add(edgeLines);
-      brick.userData.highlightEdge = edgeLines;
+      _hlEdgeMap.set(brick, edgeLines);
     } else {
-      const lines = brick.userData.highlightEdge;
-      if (!lines) return;
-      scene.remove(lines);
-      lines.geometry.dispose();
-      brick.userData.highlightEdge = null;
+      if (!existing) return;
+      scene.remove(existing);
+      existing.geometry.dispose();
+      _hlEdgeMap.delete(brick);
     }
   }
+
+  // ============================================================
+  // 移动模式：XYZ 三轴箭头 gizmo（点选积木→拖箭头沿轴逐格移动）
+  // ============================================================
+  const GIZMO_LEN = 2.2;
+  const gizmoGroup = new THREE.Group();
+  gizmoGroup.visible = false;
+  scene.add(gizmoGroup);
+  const gizmoArrows = {};   // 'x'|'y'|'z' -> { mat, baseColor }
+  const GIZMO_COLORS = { x: 0xff5a5a, y: 0x54d16a, z: 0x5a96ff };
+  const GIZMO_HOVER = 0xffe14d;
+  const GIZMO_AXIS_VEC = {
+    x: new THREE.Vector3(1, 0, 0),
+    y: new THREE.Vector3(0, 1, 0),
+    z: new THREE.Vector3(0, 0, 1),
+  };
+
+  function buildGizmoArrow(axis) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: GIZMO_COLORS[axis], depthTest: false, depthWrite: false,
+      transparent: true, opacity: 0.95,
+    });
+    // 透明加粗命中代理：视觉箭头很细，用不可见的粗圆柱扩大点击区域
+    const hitMat = new THREE.MeshBasicMaterial({
+      transparent: true, opacity: 0, depthWrite: false, depthTest: false,
+    });
+    const grp = new THREE.Group();
+    const shaftLen = GIZMO_LEN - 0.5;
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, shaftLen, 14), mat);
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.5, 18), mat);
+    const hitShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, shaftLen, 10), hitMat);
+    const hitHead = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.62, 12), hitMat);
+    for (const o of [shaft, head, hitShaft, hitHead]) {
+      o.userData.gizmoAxis = axis;
+      o.renderOrder = 2000;
+    }
+    // 沿各轴摆放：杆中点在 shaftLen/2，头中心在 shaftLen + 头高/2
+    const headOff = shaftLen + 0.25, hitHeadOff = shaftLen + 0.31;
+    if (axis === 'x') {
+      shaft.rotation.z = -Math.PI / 2; shaft.position.x = shaftLen / 2;
+      head.rotation.z = -Math.PI / 2; head.position.x = headOff;
+      hitShaft.rotation.z = -Math.PI / 2; hitShaft.position.x = shaftLen / 2;
+      hitHead.rotation.z = -Math.PI / 2; hitHead.position.x = hitHeadOff;
+    } else if (axis === 'z') {
+      shaft.rotation.x = Math.PI / 2; shaft.position.z = shaftLen / 2;
+      head.rotation.x = Math.PI / 2; head.position.z = headOff;
+      hitShaft.rotation.x = Math.PI / 2; hitShaft.position.z = shaftLen / 2;
+      hitHead.rotation.x = Math.PI / 2; hitHead.position.z = hitHeadOff;
+    } else {
+      shaft.position.y = shaftLen / 2;
+      head.position.y = headOff;
+      hitShaft.position.y = shaftLen / 2;
+      hitHead.position.y = hitHeadOff;
+    }
+    grp.add(shaft, head, hitShaft, hitHead);
+    gizmoGroup.add(grp);
+    gizmoArrows[axis] = { mat, baseColor: GIZMO_COLORS[axis] };
+  }
+  buildGizmoArrow('x');
+  buildGizmoArrow('y');
+  buildGizmoArrow('z');
+  const gizmoCenter = new THREE.Mesh(
+    new THREE.SphereGeometry(0.14, 16, 12),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false, depthWrite: false })
+  );
+  gizmoCenter.renderOrder = 2000;
+  gizmoGroup.add(gizmoCenter);
+
+  // 旋转环：绕 Y 轴的水平紫色圆环，拖动可让积木绕中心 90° 步进旋转
+  const GIZMO_ROT_COLOR = 0xc061ff;
+  const GIZMO_RING_R = GIZMO_LEN - 0.35;
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: GIZMO_ROT_COLOR, depthTest: false, depthWrite: false,
+    transparent: true, opacity: 0.95,
+  });
+  const ringHitMat = new THREE.MeshBasicMaterial({
+    transparent: true, opacity: 0, depthWrite: false, depthTest: false,
+  });
+  const gizmoRing = new THREE.Mesh(new THREE.TorusGeometry(GIZMO_RING_R, 0.06, 12, 56), ringMat);
+  gizmoRing.rotation.x = Math.PI / 2;   // 躺平（XZ 平面）
+  const gizmoRingHit = new THREE.Mesh(new THREE.TorusGeometry(GIZMO_RING_R, 0.3, 8, 40), ringHitMat);
+  gizmoRingHit.rotation.x = Math.PI / 2;
+  for (const o of [gizmoRing, gizmoRingHit]) {
+    o.userData.gizmoAxis = 'r';
+    o.renderOrder = 2000;
+  }
+  gizmoGroup.add(gizmoRing, gizmoRingHit);
+
+  function positionGizmoAtBrick() {
+    if (!moveSelBrick) return;
+    gizmoGroup.position.set(
+      moveSelBrick.group.position.x,
+      moveSelBrick.layer * BRICK_H + BRICK_H / 2,
+      moveSelBrick.group.position.z
+    );
+  }
+  function refreshGizmoVisibility() {
+    gizmoGroup.visible = !!(moveSelBrick && mode === 'build' && toolAction === 'move'
+      && bricks.indexOf(moveSelBrick) !== -1);
+    if (gizmoGroup.visible) positionGizmoAtBrick();
+  }
+  function selectMoveBrick(b) {
+    moveSelBrick = b;
+    setGizmoHover(null);
+    refreshGizmoVisibility();
+    if (b) positionGizmoAtBrick();
+  }
+  function setGizmoHover(axis) {
+    for (const a of ['x', 'y', 'z']) {
+      const active = (axis === a) || (gizmoDrag && gizmoDrag.axis === a);
+      gizmoArrows[a].mat.color.set(active ? GIZMO_HOVER : gizmoArrows[a].baseColor);
+    }
+    const ringActive = (axis === 'r') || (gizmoDrag && gizmoDrag.axis === 'r');
+    ringMat.color.set(ringActive ? GIZMO_HOVER : GIZMO_ROT_COLOR);
+  }
+
+  function setMouseFromEvent(e) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  // 轴拖拽 pointerdown：window 捕获阶段拦截，抢在 OrbitControls 之前
+  window.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    if (!moveSelBrick || mode !== 'build' || toolAction !== 'move') return;
+    if (e.target !== renderer.domElement) return;
+    setMouseFromEvent(e);
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(gizmoGroup.children, true);
+    if (!hits.length) return;
+    const axis = hits[0].object.userData.gizmoAxis;
+    if (!axis) return;
+    // 开始拖拽：禁用 OrbitControls 并阻断事件继续派发
+    controls.enabled = false;
+    pushUndo();
+    const occSaved = removeBrickFromOccupancy(moveSelBrick);
+    const origin = gizmoGroup.position.clone();
+    if (axis === 'r') {
+      // 旋转环：起点角度直接取环上命中点相对中心的方位角
+      const hp = hits[0].point;
+      gizmoDrag = {
+        axis,
+        baseI: moveSelBrick.i, baseK: moveSelBrick.k, baseLayer: moveSelBrick.layer,
+        curI: moveSelBrick.i, curK: moveSelBrick.k, curLayer: moveSelBrick.layer,
+        baseRot: moveSelBrick.rotIdx, curRot: moveSelBrick.rotIdx,
+        startAngle: Math.atan2(hp.x - origin.x, hp.z - origin.z),
+        planeOrigin: origin,
+      };
+    } else {
+      // 平移箭头：拖拽平面过 gizmo 原点、面向相机（法线=视线方向）。
+      // 不能用法线=拖拽轴的平面——那样交点在轴上坐标恒定，位移永远为 0。
+      const camDir = new THREE.Vector3();
+      camera.getWorldDirection(camDir);
+      const dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(camDir, origin);
+      const pt = new THREE.Vector3();
+      if (!raycaster.ray.intersectPlane(dragPlane, pt)) {
+        restoreBrickToOccupancy(occSaved);
+        controls.enabled = true;
+        return;
+      }
+      gizmoDrag = {
+        axis,
+        baseI: moveSelBrick.i, baseK: moveSelBrick.k, baseLayer: moveSelBrick.layer,
+        curI: moveSelBrick.i, curK: moveSelBrick.k, curLayer: moveSelBrick.layer,
+        startPoint: pt.clone(),                    // 相机平面上的起始交点
+        planeNormal: camDir.clone(),               // 平面法线固定（拖拽中相机不动）
+        planeOrigin: origin,                        // 拖拽平面固定在起始位置
+      };
+    }
+    setGizmoHover(axis);
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
+
+  // 轴拖拽 pointermove：平移=射线打到相机平面投影到轴；旋转=水平面方位角差
+  window.addEventListener('pointermove', (e) => {
+    if (!gizmoDrag) return;
+    setMouseFromEvent(e);
+    raycaster.setFromCamera(mouse, camera);
+    const d = gizmoDrag;
+
+    if (d.axis === 'r') {
+      // 旋转：射线打到过中心的水平面，方位角增量按 90° 量化
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(GIZMO_AXIS_VEC.y, d.planeOrigin);
+      const pt = new THREE.Vector3();
+      if (!raycaster.ray.intersectPlane(plane, pt)) return;
+      let da = Math.atan2(pt.x - d.planeOrigin.x, pt.z - d.planeOrigin.z) - d.startAngle;
+      da = Math.atan2(Math.sin(da), Math.cos(da));   // 折到 [-π, π]
+      const steps = Math.round(da / (Math.PI / 2));
+      const target = ((d.baseRot + steps) % 4 + 4) % 4;
+      if (target === d.curRot) return;
+      const b = moveSelBrick;
+      const fpCur = getFootprint(b.type, d.curRot);
+      for (const [ci, ck] of fpCur.cells) occupancy.delete(occKey(d.curI + ci, d.curK + ck, d.curLayer));
+      const fpT = getFootprint(b.type, target);
+      // 绕积木中心旋转：由固定中心反推新锚点，四舍五入吸附网格
+      const ni = Math.round(d.planeOrigin.x + HALF_W - fpT.w / 2);
+      const nk = Math.round(d.planeOrigin.z + HALF_H - fpT.d / 2);
+      if (canPlace(b.type, target, ni, nk, d.curLayer)) {
+        d.curRot = target; d.curI = ni; d.curK = nk;
+        b.rotIdx = target; b.i = ni; b.k = nk;
+        b.group.rotation.y = target * Math.PI / 2;
+        const [x, z] = gridToWorld(ni, nk);
+        b.group.position.set(x + fpT.w / 2 - 0.5, d.curLayer * BRICK_H, z + fpT.d / 2 - 0.5);
+        for (const [ci, ck] of fpT.cells) occupancy.set(occKey(ni + ci, nk + ck, d.curLayer), b.id);
+        positionGizmoAtBrick();
+        updateStatus();
+      } else {
+        // 转不下：恢复当前占用，积木不转
+        for (const [ci, ck] of fpCur.cells) occupancy.set(occKey(d.curI + ci, d.curK + ck, d.curLayer), b.id);
+      }
+      return;
+    }
+
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(d.planeNormal, d.planeOrigin);
+    const pt = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(plane, pt)) return;
+    // 交点相对起点的位移投影到拖拽轴 → 有符号轴向位移，再按格量化
+    const scalar = pt.sub(d.startPoint).dot(GIZMO_AXIS_VEC[d.axis]);
+    const stepLen = d.axis === 'y' ? BRICK_H : 1;
+    const steps = Math.round(scalar / stepLen);
+    let ni = d.curI, nk = d.curK, nl = d.curLayer;
+    if (d.axis === 'x') ni = d.baseI + steps;
+    else if (d.axis === 'z') nk = d.baseK + steps;
+    else nl = Math.max(0, d.baseLayer + steps);
+    if (ni === d.curI && nk === d.curK && nl === d.curLayer) return;
+    const b = moveSelBrick;
+    const fp = getFootprint(b.type, b.rotIdx);
+    // 清掉当前占用，再检查目标位置
+    for (const [ci, ck] of fp.cells) occupancy.delete(occKey(d.curI + ci, d.curK + ck, d.curLayer));
+    if (canPlace(b.type, b.rotIdx, ni, nk, nl)) {
+      d.curI = ni; d.curK = nk; d.curLayer = nl;
+      b.i = ni; b.k = nk; b.layer = nl;
+      const [x, z] = gridToWorld(ni, nk);
+      b.group.position.set(x + fp.w / 2 - 0.5, nl * BRICK_H, z + fp.d / 2 - 0.5);
+      for (const [ci, ck] of fp.cells) occupancy.set(occKey(ni + ci, nk + ck, nl), b.id);
+      positionGizmoAtBrick();
+      updateStatus();
+    } else {
+      // 放不下：恢复当前占用，积木不动
+      for (const [ci, ck] of fp.cells) occupancy.set(occKey(d.curI + ci, d.curK + ck, d.curLayer), b.id);
+    }
+  });
+
+  function endGizmoDrag() {
+    if (!gizmoDrag) return;
+    const d = gizmoDrag;
+    const b = moveSelBrick;
+    // 确保 occupancy 与最终位置一致（整段拖动没移动过也要补回）
+    const fp = getFootprint(b.type, b.rotIdx);
+    for (const [ci, ck] of fp.cells) occupancy.set(occKey(d.curI + ci, d.curK + ck, d.curLayer), b.id);
+    gizmoDrag = null;
+    controls.enabled = true;
+    setGizmoHover(null);
+    refreshOutlineSelection();
+    updateStatus();
+    autoSave();
+  }
+  window.addEventListener('pointerup', () => { if (gizmoDrag) endGizmoDrag(); });
+  window.addEventListener('pointercancel', () => { if (gizmoDrag) endGizmoDrag(); });
 
   renderer.domElement.addEventListener('pointermove', onPointerMove);
   renderer.domElement.addEventListener('pointerdown', (e) => {
@@ -2795,63 +3376,18 @@
             flashStatus('没点到积木');
           }
         } else if (toolAction === 'move') {
-          // 移动模式
-          if (movingBrick) {
-            // 正在移动 → 点击放下
-            const p = computePlacement(intersects);
-            if (p) {
-              // 检查新位置是否合法（临时把 movingBrick 从 occupancy 里移除再检查）
-              const tmpRec = removeBrickFromOccupancy(movingBrick);
-              const fp = getFootprint(movingBrick.type, movingBrick.rotIdx);
-              // 移动时保持 rotIdx 不变，用当前积木的类型和旋转
-              const ok = canPlace(movingBrick.type, movingBrick.rotIdx, p.i, p.k, p.layer);
-              if (ok) {
-                pushUndo();
-                // 更新积木位置数据
-                movingBrick.i = p.i;
-                movingBrick.k = p.k;
-                movingBrick.layer = p.layer;
-                const [x, z] = gridToWorld(p.i, p.k);
-                movingBrick.group.position.set(
-                  x + fp.w / 2 - 0.5,
-                  p.layer * BRICK_H,
-                  z + fp.d / 2 - 0.5
-                );
-                // 重新写入 occupancy
-                for (const [ci, ck] of fp.cells) {
-                  occupancy.set(occKey(p.i + ci, p.k + ck, p.layer), movingBrick.id);
-                }
-                movingBrick.group.visible = true;
-                movingBrick = null;
-                refreshOutlineSelection();
-                updateStatus();
-                autoSave();
-              } else {
-                // 放不下 → 恢复 occupancy，取消移动
-                restoreBrickToOccupancy(tmpRec);
-                movingBrick.group.visible = true;
-                movingBrick = null;
-                flashStatus('放不下：越界/重叠/道路/缺支撑');
-              }
-            } else {
-              // 没点到有效位置 → 取消移动
-              movingBrick.group.visible = true;
-              movingBrick = null;
-            }
+          // 点击选中积木显示 gizmo；点空白处取消选择（轴拖拽由 window 监听处理）
+          const hit = intersects.find(h => h.object !== ground);
+          let brick = null;
+          if (hit) {
+            const group = hit.object.userData.parentGroup || hit.object;
+            brick = bricks.find(b => b.group === group) || null;
+          }
+          if (brick) {
+            selectMoveBrick(brick);
+            flashStatus('已选中：拖箭头逐格移动，拖紫色圆环 90° 旋转，点空白或右键取消');
           } else {
-            // 没在移动 → 点击积木开始移动
-            const hit = intersects.find(h => h.object !== ground);
-            if (hit) {
-              const group = hit.object.userData.parentGroup || hit.object;
-              const brick = bricks.find(b => b.group === group);
-              if (brick) {
-                movingBrick = brick;
-                brick.group.visible = false;  // 隐藏原积木，用 preview 显示跟随
-                flashStatus('移动中，点击放下，右键取消');
-              }
-            } else {
-              flashStatus('没点到积木');
-            }
+            selectMoveBrick(null);
           }
         } else {
           // 放置模式
@@ -2869,11 +3405,10 @@
     } else if (btn === 2) {
       // 右键：OrbitControls PAN 平移画面（道路/绿地不再用右键擦除）
       if (mode === 'build') {
-        // 移动模式下右键取消移动
-        if (toolAction === 'move' && movingBrick) {
-          movingBrick.group.visible = true;
-          movingBrick = null;
-          flashStatus('已取消移动');
+        // 移动模式下右键取消选择
+        if (toolAction === 'move' && moveSelBrick) {
+          selectMoveBrick(null);
+          flashStatus('已取消选择');
           return;
         }
         // 建筑兜底：右键也能删积木（不变）
@@ -3067,6 +3602,13 @@
       toolBar.appendChild(removeBtn);
       list.appendChild(toolBar);
 
+      if (toolAction === 'move') {
+        const hint = document.createElement('div');
+        hint.style.cssText = 'font-size:11px;color:#999;padding:4px;line-height:1.4;';
+        hint.innerHTML = dict['move-hint'] || '点击积木选中<br>拖红/绿/蓝箭头<br>沿 X/Y/Z 轴逐格移动<br>点空白或右键取消';
+        list.appendChild(hint);
+      }
+
       for (const key of Object.keys(BRICK_TYPES)) {
         const btn = document.createElement('button');
         btn.className = 'tool-btn brick-btn' + (key === curType ? ' active' : '');
@@ -3208,6 +3750,7 @@
     if (cellHighlightLines) { setCellHighlight(0, 0, false); hoveredCellKey = null; }
     if (roadStart) roadStart = null;          // 切换模式取消未完成的画线
     showSegHighlight(null);
+    selectMoveBrick(null);                     // 切换模式取消积木选中
     mode = m;
     document.getElementById('mode-road').classList.toggle('active', m === 'road');
     document.getElementById('mode-plot').classList.toggle('active', m === 'plot');
@@ -3224,11 +3767,8 @@
     // 切换放置/拆除时取消未完成的画线
     if (roadStart) roadStart = null;
     showSegHighlight(null);
-    // 退出 move 模式时取消正在移动的积木
-    if (movingBrick && a !== 'move') {
-      movingBrick.group.visible = true;
-      movingBrick = null;
-    }
+    // 退出 move 工具时取消积木选中
+    if (a !== 'move') selectMoveBrick(null);
     toolAction = a;
     buildTypeButtons();
     updateCursor();
